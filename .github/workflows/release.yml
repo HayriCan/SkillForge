@@ -21,11 +21,6 @@ jobs:
             args: ''
 
     runs-on: ${{ matrix.platform }}
-
-    env:
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
-
     steps:
       - uses: actions/checkout@v4
 
@@ -53,30 +48,11 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
-      - name: Debug - Tauri CLI version and env check
-        shell: bash
-        run: |
-          npx tauri --version
-          echo "KEY set: $([ -n "$TAURI_SIGNING_PRIVATE_KEY" ] && echo 'yes' || echo 'no')"
-          echo "KEY length: ${#TAURI_SIGNING_PRIVATE_KEY}"
-          echo "PWD set: $([ -n "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ] && echo 'yes' || echo 'no')"
-          echo "PWD length: ${#TAURI_SIGNING_PRIVATE_KEY_PASSWORD}"
-
-      - name: Build Tauri app
-        shell: bash
-        run: npx tauri build ${{ matrix.args }} -v
-
-      - name: Debug - list artifacts
-        shell: bash
-        run: |
-          echo "=== Signature files ==="
-          find src-tauri/target -name "*.sig" -type f 2>/dev/null || echo "No .sig files"
-          echo "=== Updater archives ==="
-          find src-tauri/target -path "*/bundle/*" \( -name "*.zip" -o -name "*.tar.gz" \) -type f 2>/dev/null || echo "No archives"
-
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Skill Forge ${{ github.ref_name }}'
