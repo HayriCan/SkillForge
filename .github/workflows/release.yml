@@ -21,6 +21,11 @@ jobs:
             args: ''
 
     runs-on: ${{ matrix.platform }}
+
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+
     steps:
       - uses: actions/checkout@v4
 
@@ -48,11 +53,19 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
+      - name: Verify signing key
+        shell: bash
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "Signing key is set (length: ${#TAURI_SIGNING_PRIVATE_KEY})"
+          else
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set"
+            exit 1
+          fi
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'Skill Forge ${{ github.ref_name }}'
