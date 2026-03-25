@@ -200,9 +200,17 @@ export async function createEmptyProfile(name: string, description?: string): Pr
 /**
  * Restore a profile: overwrite current Claude config with the snapshot.
  * Auto-saves current state as Default before the very first profile switch.
+ * Also saves the currently active named profile before switching away from it.
  */
 export async function loadProfile(name: string): Promise<void> {
   await autoSaveDefault();
+
+  // Save current active named profile's live state before switching away
+  const currentProfile = getActiveProfile();
+  if (currentProfile) {
+    const dir = await profilesDir();
+    await snapshotCurrentStateTo(`${dir}/${currentProfile}`);
+  }
   const base = await claudeDir();
   const dir = await profilesDir();
   const profileDir = `${dir}/${name}`;
@@ -352,8 +360,16 @@ export function clearActiveProfile(): void {
 /**
  * Switch to Default: restore the auto-saved Default snapshot if it exists,
  * otherwise just clear the active profile marker.
+ * Saves the currently active named profile before switching away from it.
  */
 export async function switchToDefault(): Promise<void> {
+  // Save current active named profile's live state before switching to default
+  const currentProfile = getActiveProfile();
+  if (currentProfile) {
+    const dir = await profilesDir();
+    await snapshotCurrentStateTo(`${dir}/${currentProfile}`);
+  }
+
   const dir = await profilesDir();
   const defaultDir = `${dir}/${DEFAULT_SNAPSHOT}`;
   const base = await claudeDir();
