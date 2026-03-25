@@ -8,7 +8,7 @@
 
 Visually manage your `~/.claude` configuration — agents, skills, MCP servers, profiles, hooks, and more — without ever touching a raw file.
 
-[![GitHub release](https://img.shields.io/github/v/release/HayriCan/skill-forge?color=blueviolet&label=latest)](https://github.com/HayriCan/skill-forge/releases/latest)
+[![GitHub release](https://img.shields.io/github/v/release/HayriCan/SkillForge?color=blueviolet&label=latest)](https://github.com/HayriCan/SkillForge/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#installation)
 [![Built with Tauri](https://img.shields.io/badge/Tauri-2-FFC131?logo=tauri&logoColor=white)](https://tauri.app)
@@ -24,11 +24,13 @@ Claude Code stores everything in `~/.claude/` — agent definitions, skill promp
 
 **Skill Forge** is a native desktop app that puts a clean UI on top of all of it.
 
-- Browse, create, and edit every resource type through a structured interface
+- Browse, create, and edit 12 Claude Code resource views through a structured interface
 - Switch between named profiles (work, personal, client) in one click
 - Search across all your agents, skills, and commands with `Ctrl+K`
 - Manage MCP servers without touching `.mcp.json`
-- Back up and restore your entire config as a portable bundle
+- Back up and restore your config as a portable `.sfbackup` bundle
+- Use a custom Claude directory from the in-app preferences modal
+- Switch the core UI language without editing config files
 - Catch validation errors before they silently break your workflows
 
 > Stop editing YAML by hand. Start shipping prompts faster.
@@ -39,15 +41,37 @@ Claude Code stores everything in `~/.claude/` — agent definitions, skill promp
 
 | | Feature | Description |
 |---|---|---|
-| **Agents & Skills** | Visual editor | Syntax-highlighted Markdown editor with live preview |
+| **12 Views** | Full config coverage | Agents, Skills, Commands, Hooks, Plans, Plugins, Sessions, Tasks, Teams, Todos, Config, and Settings |
+| **Agents & Skills** | Visual editor | Syntax-highlighted Markdown editor with Markdown view plus raw editing mode for skills |
 | **MCP Servers** | GUI management | Add, edit, enable/disable servers without touching JSON |
 | **Profiles** | Config snapshots | Save and restore full `.claude` configurations per project or client |
 | **Command Palette** | `Ctrl+K` | Fuzzy-search across all 12 resource types instantly |
-| **Backup & Restore** | Portable bundles | Export your entire config as a `.zip`, restore anytime |
+| **Backup & Restore** | Portable bundles | Export selected capability groups to `.sfbackup`, then restore in merge or overwrite mode |
 | **History & Diff** | Change review | See what changed before you overwrite anything |
+| **Settings** | Structured + raw JSON | Switch between guided settings sections and direct JSON editing |
+| **Preferences** | App-level controls | Change theme, language, and custom Claude directory from one modal |
+| **Language Support** | 9 UI languages | English, Deutsch, Français, Japanese, Korean, Polish, Turkish, Simplified Chinese, Traditional Chinese |
 | **Validation** | Inline errors | Catch invalid names, malformed JSON, and YAML issues as you type |
 | **Syntax Highlighting** | Shiki-powered | Beautiful code blocks inside the Markdown editor |
-| **Themes** | Light / Dark | Auto-detects system preference, or override manually |
+| **Themes & Updates** | Native app polish | Light/Dark/Auto theme, manual update checks, and in-app updater wiring |
+
+---
+
+## Language Support
+
+Skill Forge now includes built-in localization for the app shell and key settings flows. The current UI language options are:
+
+- English
+- Deutsch
+- Français
+- Japanese
+- Korean
+- Polish
+- Turkish
+- Simplified Chinese
+- Traditional Chinese
+
+You can change the language from `Preferences` inside the app. The localization layer currently covers navigation, menus, preferences, updater messages, and the structured settings UI.
 
 ---
 
@@ -72,7 +96,7 @@ Claude Code stores everything in `~/.claude/` — agent definitions, skill promp
 | Switch configs | Manual copy/paste | One-click profile switch |
 | MCP server setup | Edit `.mcp.json` by hand | GUI with form validation |
 | Find a file | `ls ~/.claude/agents/` | `Ctrl+K` fuzzy search |
-| Backup config | `cp -r ~/.claude ~/backup` | One-click export to zip |
+| Backup config | `cp -r ~/.claude ~/backup` | Selective export to `.sfbackup` |
 | Catch typos | After the fact | Inline, as you type |
 
 ---
@@ -129,6 +153,8 @@ npm run tauri dev
 ```
 
 **Tech stack:** Tauri 2 · Svelte 5 · TypeScript · Tailwind CSS v4 · Shiki
+
+**Recent product additions:** localization, preferences modal, custom Claude directory support, raw JSON settings mode, raw skill editing mode, and improved backup/restore flow.
 
 ---
 

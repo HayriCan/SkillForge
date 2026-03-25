@@ -12,7 +12,7 @@ Download the latest release for your platform:
 | macOS | `.dmg` universal (Intel + Apple Silicon) |
 | Linux | `.AppImage` or `.deb` |
 
-Visit the [Releases page](https://github.com/HayriCan/skill-forge/releases/latest) to download.
+Visit the [Releases page](https://github.com/HayriCan/SkillForge/releases/latest) to download.
 
 ### Package Managers
 
@@ -46,8 +46,8 @@ If you want to build Skill Forge from source:
 
 ```bash
 # Prerequisites: Node 20+, Rust stable
-git clone https://github.com/HayriCan/skill-forge.git
-cd skill-forge
+git clone https://github.com/HayriCan/SkillForge.git
+cd SkillForge
 npm install
 npm run tauri dev
 ```
