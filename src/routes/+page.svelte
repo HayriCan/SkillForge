@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { getVersion } from '@tauri-apps/api/app';
   import Sidebar from '../components/Sidebar.svelte';
   import Toast from '../components/Toast.svelte';
   import UpdaterModal from '../components/UpdaterModal.svelte';
@@ -52,6 +53,7 @@
   let showPalette = $state(false);
   let showOnboarding = $state(false);
   let showAbout = $state(false);
+  let appVersion = $state('');
   let showPreferences = $state(false);
   let initialSelect = $state('');
   let prefClaudeDir = $state('');
@@ -221,6 +223,7 @@
     autoSaveDefault(); // capture pre-cc-manager state on first ever launch
     loadAllCounts();
     checkForUpdates();
+    getVersion().then(v => appVersion = v);
     setFontSize(getFontSize());
     if (!localStorage.getItem('sf-onboarded')) {
       showOnboarding = true;
@@ -342,7 +345,7 @@
         onkeydown={(e) => { if (e.key === 'Escape') showAbout = false; }}>
         <img src="/app-icon.png" alt="Skill Forge" class="w-16 h-16 mx-auto mb-4" />
         <h2 class="text-[16px] font-semibold text-[var(--text-primary)]">Skill Forge</h2>
-        <p class="text-[12px] text-[var(--text-ghost)] mt-1">v0.2.0</p>
+        <p class="text-[12px] text-[var(--text-ghost)] mt-1">v{appVersion || '...'}</p>
         <p class="text-[12px] text-[var(--text-muted)] mt-3">{t('about.description')}</p>
         <div class="flex gap-3 justify-center mt-3">
           <button onclick={() => openUrl('https://github.com/HayriCan/SkillForge')} class="text-[12px] text-[var(--accent)] hover:underline">{t('about.homepage')}</button>
