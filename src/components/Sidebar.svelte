@@ -1,8 +1,12 @@
 <script lang="ts">
+  import { getVersion } from '@tauri-apps/api/app';
   import { getActiveProfile, listProfiles, loadProfile, switchToDefault, type Profile } from '../lib/profiles';
   import { getTheme, setTheme, type Theme } from '../lib/theme.svelte';
   import { addToast } from '../lib/toast.svelte';
   import { t } from '../lib/i18n.svelte';
+
+  let appVersion = $state('');
+  getVersion().then(v => appVersion = v);
 
   type GearAction = 'about' | 'check-updates' | 'feedback' | 'homepage' | 'preferences' | 'toggle-devtools' | 'export' | 'import';
 
@@ -204,7 +208,7 @@
 
   <!-- Footer -->
   <div class="px-3 py-2.5 border-t border-[var(--border-default)] flex items-center justify-between">
-    <span class="text-[10px] text-[var(--text-ghost)] font-mono">v0.2.0</span>
+    <span class="text-[10px] text-[var(--text-ghost)] font-mono">v{appVersion || '...'}</span>
     <div class="flex items-center gap-0.5">
       <button
         onclick={cycleTheme}
