@@ -39,6 +39,7 @@
   let showHistory = $state(false);
   let nameError = $state('');
   let historyEntries = $state<ReturnType<typeof getFileHistory>>([]);
+  let rawMode = $state(false);
 
   function formatDate(d: Date | null): string {
     if (!d) return '';
@@ -77,6 +78,7 @@
     dirty = false;
     isNew = false;
     showHistory = false;
+    rawMode = false;
     historyEntries = getFileHistory(item.path);
   }
 
@@ -334,10 +336,30 @@
               title="View history"
             ><svg class="w-3.5 h-3.5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg> {historyEntries.length}</button>
           {/if}
+          <button
+            onclick={() => { rawMode = !rawMode; }}
+            class="text-[10px] font-mono px-2 py-0.5 rounded-md border transition-colors
+                   {rawMode
+                     ? 'bg-[var(--accent-subtle)] border-[var(--accent-dim)] text-[var(--accent)]'
+                     : 'bg-transparent border-[var(--border-subtle)] text-[var(--text-ghost)] hover:text-[var(--text-muted)] hover:border-[var(--border-default)]'}"
+          >
+            Raw
+          </button>
         </div>
       </div>
       <div class="text-[10px] text-[var(--text-ghost)] font-mono truncate mb-3">{selected.path}</div>
-      <MarkdownEditor bind:value={editContent} oninput={() => { dirty = editContent !== selected?.content; }} />
+      {#if rawMode}
+        <div class="flex-1 min-h-0 flex flex-col">
+          <textarea
+            bind:value={editContent}
+            oninput={() => { dirty = editContent !== selected?.content; }}
+            class="flex-1 min-h-0 w-full bg-[var(--surface-1)] border border-[var(--border-subtle)] rounded-lg p-5 text-[13px] text-[var(--text-primary)] font-mono leading-relaxed outline-none resize-none focus:border-[var(--accent-dim)] transition-colors"
+            spellcheck="false"
+          ></textarea>
+        </div>
+      {:else}
+        <MarkdownEditor bind:value={editContent} oninput={() => { dirty = editContent !== selected?.content; }} />
+      {/if}
       {#if dirty}
         <div class="flex gap-2 mt-3 animate-fade-in">
           <button onclick={save} class="px-4 py-2 bg-[var(--accent-dim)] hover:bg-[var(--accent)] rounded-lg text-[13px] text-[var(--surface-0)] font-semibold transition-all duration-200 shadow-lg shadow-black/5">Save</button>
