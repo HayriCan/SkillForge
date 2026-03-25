@@ -26,4 +26,6 @@ features:
     details: Catch invalid file names, malformed JSON, and YAML errors inline before saving.
   - title: History & Diff
     details: Review changes before saving and restore previous versions of any config file.
+  - title: Auto Updates
+    details: Check published releases, download and install them in-app, then restart into the updated build.
 ---

@@ -53,7 +53,7 @@ Claude Code stores everything in `~/.claude/` — agent definitions, skill promp
 | **Language Support** | 9 UI languages | English, Deutsch, Français, Japanese, Korean, Polish, Turkish, Simplified Chinese, Traditional Chinese |
 | **Validation** | Inline errors | Catch invalid names, malformed JSON, and YAML issues as you type |
 | **Syntax Highlighting** | Shiki-powered | Beautiful code blocks inside the Markdown editor |
-| **Themes & Updates** | Native app polish | Light/Dark/Auto theme, manual update checks, and in-app updater wiring |
+| **Themes & Updates** | Native app polish | Light/Dark/Auto theme, silent startup checks, in-app download/install, and restart prompts |
 
 ---
 
@@ -128,6 +128,18 @@ npm run tauri build
 ```
 
 The compiled binary will be in `src-tauri/target/release/bundle/`.
+
+Local source builds do not always match the official release metadata and signing chain, so the in-app updater may be limited or unavailable on self-built binaries.
+
+### Auto-Updates
+
+Official GitHub release builds check for published updates silently on startup. You can also trigger **Check for Updates** from the app menu to open the same install flow manually.
+
+When an update is available, Skill Forge downloads it, installs it in place, and then asks for a restart to finish the upgrade.
+
+Release-built installs are the supported path for auto-updates. Self-built binaries are best-effort only, draft GitHub releases stay invisible until published, and some Linux package formats may still require manual upgrades.
+
+On macOS, the relaunched app can still hit Gatekeeper or notarization prompts after an update is applied. If that happens, use the same **Open Anyway** or `xattr -cr` workaround as the first launch.
 
 ### Package Managers
 

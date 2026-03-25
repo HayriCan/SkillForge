@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import Sidebar from '../components/Sidebar.svelte';
   import Toast from '../components/Toast.svelte';
+  import UpdaterModal from '../components/UpdaterModal.svelte';
   import { addToast } from '../lib/toast.svelte';
   import CommandPalette from '../components/CommandPalette.svelte';
   import Onboarding from '../components/Onboarding.svelte';
@@ -64,7 +65,7 @@
         showAbout = true;
         break;
       case 'check-updates':
-        checkForUpdatesManual();
+        await checkForUpdatesManual();
         break;
       case 'feedback':
         await openUrl('https://github.com/HayriCan/SkillForge/issues');
@@ -320,6 +321,7 @@
   </main>
 
   <Toast />
+  <UpdaterModal />
 
   <CommandPalette
     open={showPalette}

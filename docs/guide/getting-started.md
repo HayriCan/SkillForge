@@ -14,14 +14,22 @@ Download the latest release for your platform:
 
 Visit the [Releases page](https://github.com/HayriCan/SkillForge/releases/latest) to download.
 
+### Auto-Updates
+
+Official GitHub release builds check for published updates on startup. You can also run **Check for Updates** from the app menu to open the manual install flow.
+
+If an update is available, Skill Forge downloads it, installs it in place, and then prompts for a restart to finish the upgrade.
+
+Source builds are best-effort only. Draft GitHub releases do not appear to the updater until they are published, and some Linux package formats may still need manual upgrades.
+
 ### Package Managers
 
 ```bash
 # macOS (coming soon)
-brew install cc-manager
+brew install skill-forge
 
 # Windows (coming soon)
-winget install cc-manager
+winget install skill-forge
 ```
 
 ## First Launch
@@ -31,6 +39,12 @@ When you open Skill Forge for the first time, the onboarding wizard will guide y
 1. **Detecting your Claude Code installation** — Skill Forge automatically locates your `~/.claude/` directory.
 2. **Scanning existing configuration** — All agents, skills, commands, hooks, and settings are indexed.
 3. **Creating your first profile** — Optionally snapshot your current config as a named profile.
+
+### Platform Notes
+
+- Windows works best when Skill Forge is installed from the official release packages.
+- macOS can still show Gatekeeper or notarization prompts after an update relaunch; use **Open Anyway** or `xattr -cr` if required.
+- Linux package behavior can vary between `.AppImage` and `.deb`, so some installs may still need a manual upgrade path.
 
 ## The Interface
 
