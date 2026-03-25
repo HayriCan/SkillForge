@@ -1,0 +1,95 @@
+{
+  "version": "1",
+  "createdAt": "2026-03-24T10:00:00.000Z",
+  "claudeDir": "/home/testuser/.claude",
+  "files": [
+    {
+      "relativePath": "settings.json",
+      "content": "{\n  \"outputStyle\": \"explanatory\",\n  \"effortLevel\": \"high\",\n  \"skipDangerousModePermissionPrompt\": false,\n  \"env\": {\n    \"NODE_ENV\": \"development\",\n    \"DEBUG\": \"true\"\n  },\n  \"permissions\": {\n    \"allow\": [\"Bash(npm:*)\", \"Bash(git:*)\", \"Bash(npx:*)\"],\n    \"deny\": [\"Bash(rm:-rf)\"],\n    \"additionalDirectories\": [\"/home/testuser/projects\"]\n  },\n  \"hooks\": {\n    \"PostToolUse\": [\n      {\n        \"matcher\": \"Edit|Write\",\n        \"hooks\": [\n          { \"type\": \"command\", \"command\": \"npx prettier --write $CLAUDE_TOOL_OUTPUT\", \"timeout\": 5000 }\n        ]\n      }\n    ],\n    \"Stop\": [\n      {\n        \"hooks\": [\n          { \"type\": \"command\", \"command\": \"notify-send 'Claude Code' 'Session ended'\" }\n        ]\n      }\n    ]\n  },\n  \"enabledPlugins\": {\n    \"prettier\": true,\n    \"eslint\": true,\n    \"git-tools\": false\n  },\n  \"statusLine\": {\n    \"type\": \"command\",\n    \"command\": \"echo 'dev-setup profile'\"\n  }\n}"
+    },
+    {
+      "relativePath": "CLAUDE.md",
+      "content": "# Global Rules\n\n## Communication\n- Always respond in English\n- Be concise and direct\n\n## Code Style\n- Use TypeScript strict mode\n- Prefer functional patterns\n- Write JSDoc for public APIs\n\n## Git Workflow\n- Conventional commits: feat:, fix:, docs:, refactor:\n- Never force-push to main\n- Run tests before committing\n\n## Paths\n- Projects: /home/testuser/projects/\n"
+    },
+    {
+      "relativePath": "MEMORY.md",
+      "content": "# Memory Index\n\n- [user_role](memory/user_role.md): Senior fullstack developer, TypeScript + Rust\n- [feedback_commits](memory/feedback_commits.md): Prefer squash merges for feature branches\n"
+    },
+    {
+      "relativePath": "agents/code-reviewer.md",
+      "content": "---\nname: code-reviewer\ndescription: Reviews code for quality, security, and best practices. Use when you want a thorough code review before merging.\ntools: Read, Glob, Grep\n---\n\nYou are a senior code reviewer. Focus on:\n- Security vulnerabilities (OWASP Top 10)\n- Performance bottlenecks\n- Type safety and null handling\n- Test coverage gaps\n\nAlways provide actionable feedback with line references.\n"
+    },
+    {
+      "relativePath": "agents/tester.md",
+      "content": "---\nname: tester\ndescription: Writes and runs tests. Follows red-green-refactor TDD cycle.\ntools: Read, Write, Edit, Bash, Glob, Grep\n---\n\nYou are a test-first developer. For every feature:\n1. Write failing tests first\n2. Implement minimal code to pass\n3. Refactor without breaking tests\n\nPrefer integration tests over mocks where possible.\n"
+    },
+    {
+      "relativePath": "agents/doc-writer.md",
+      "content": "---\nname: doc-writer\ndescription: Generates and updates documentation. Use for README updates, API docs, and changelogs.\ntools: Read, Write, Edit, Glob, Grep\n---\n\nYou write clear, accurate documentation. Keep docs close to code. Update changelogs with conventional commit format.\n"
+    },
+    {
+      "relativePath": "skills/commit.md",
+      "content": "Review staged changes and write a conventional commit message. Run `git diff --staged`, summarize the changes, and create a commit with format: `type(scope): description`. Types: feat, fix, docs, refactor, test, chore.\n"
+    },
+    {
+      "relativePath": "skills/review.md",
+      "content": "Perform a thorough code review of the current branch diff against main. Check for security issues, logic errors, missing tests, and style violations. Output a structured report with severity levels: critical, warning, suggestion.\n"
+    },
+    {
+      "relativePath": "skills/release.md",
+      "content": "Prepare a release: bump version in package.json, update CHANGELOG.md with all commits since last tag, create a git tag, and output the release notes.\n"
+    },
+    {
+      "relativePath": "commands/deploy.md",
+      "content": "---\ndescription: Deploy the current branch to staging environment\n---\n\nRun the deployment pipeline:\n1. `npm run build` — verify build passes\n2. `npm test` — verify all tests pass\n3. `git push origin HEAD` — push to remote\n4. Notify the team in Slack: deployment started\n"
+    },
+    {
+      "relativePath": "commands/setup-project.md",
+      "content": "---\ndescription: Initialize a new project with standard tooling\n---\n\nSet up a new TypeScript project:\n1. Initialize package.json with `npm init -y`\n2. Install TypeScript, ESLint, Prettier\n3. Create tsconfig.json with strict mode\n4. Add .eslintrc and .prettierrc\n5. Create src/index.ts entry point\n6. Add npm scripts: dev, build, test, lint\n"
+    },
+    {
+      "relativePath": "plans/2026-03-20-auth-refactor.md",
+      "content": "---\nstatus: completed\ntitle: Auth Middleware Refactor\ndate: 2026-03-20\n---\n\n# Auth Middleware Refactor\n\n## Goal\nReplace legacy session-based auth with JWT tokens to meet compliance requirements.\n\n## Tasks\n- [x] Audit existing auth middleware\n- [x] Design JWT token structure\n- [x] Implement token generation and validation\n- [x] Update all protected routes\n- [x] Write integration tests\n- [x] Deploy to staging\n\n## Notes\nLegal flagged the old session storage mechanism. New implementation uses short-lived access tokens (15min) + refresh tokens (7 days).\n"
+    },
+    {
+      "relativePath": "plans/2026-03-24-backup-tests.md",
+      "content": "---\nstatus: in-progress\ntitle: Backup Module Tests\ndate: 2026-03-24\n---\n\n# Backup Module Tests\n\n## Goal\nAdd comprehensive test coverage for the backup/restore functionality.\n\n## Tasks\n- [x] Set up Vitest\n- [x] Create Tauri API mocks\n- [x] Create test fixtures\n- [ ] Write unit tests\n- [ ] Add edge case tests for large files\n"
+    },
+    {
+      "relativePath": "tasks/backup-tests/task-1.json",
+      "content": "{\n  \"id\": \"1\",\n  \"subject\": \"Vitest kurulumu ve yapılandırması\",\n  \"description\": \"Install vitest, configure vite.config.js, add test scripts to package.json\",\n  \"status\": \"completed\",\n  \"owner\": \"setup-agent\",\n  \"createdAt\": \"2026-03-24T07:30:00.000Z\",\n  \"updatedAt\": \"2026-03-24T07:37:00.000Z\"\n}"
+    },
+    {
+      "relativePath": "tasks/backup-tests/task-2.json",
+      "content": "{\n  \"id\": \"2\",\n  \"subject\": \"Tauri API mock'larını oluştur\",\n  \"description\": \"Create mock files for @tauri-apps/api/path and src/lib/fs\",\n  \"status\": \"completed\",\n  \"owner\": \"mock-agent\",\n  \"createdAt\": \"2026-03-24T07:30:00.000Z\",\n  \"updatedAt\": \"2026-03-24T07:37:30.000Z\"\n}"
+    },
+    {
+      "relativePath": "tasks/backup-tests/task-3.json",
+      "content": "{\n  \"id\": \"3\",\n  \"subject\": \"Test fixture dosyalarını oluştur\",\n  \"description\": \"Create JSON fixture files in tests/fixtures/ for backup bundle scenarios\",\n  \"status\": \"completed\",\n  \"owner\": \"mock-agent\",\n  \"createdAt\": \"2026-03-24T07:30:00.000Z\",\n  \"updatedAt\": \"2026-03-24T07:37:35.000Z\"\n}"
+    },
+    {
+      "relativePath": "tasks/backup-tests/task-4.json",
+      "content": "{\n  \"id\": \"4\",\n  \"subject\": \"Backup unit testlerini yaz\",\n  \"description\": \"Write unit tests for exportBackup, importBackup, and collectFiles\",\n  \"status\": \"completed\",\n  \"owner\": \"test-writer\",\n  \"blockedBy\": [\"1\", \"2\", \"3\"],\n  \"createdAt\": \"2026-03-24T07:30:00.000Z\",\n  \"updatedAt\": \"2026-03-24T07:39:40.000Z\"\n}"
+    },
+    {
+      "relativePath": "teams/backup-tests.json",
+      "content": "{\n  \"team_name\": \"backup-tests\",\n  \"description\": \"Backup modülü için vitest kurulumu, Tauri mock'ları ve unit testlerin yazılması\",\n  \"createdAt\": \"2026-03-24T07:30:00.000Z\",\n  \"members\": [\n    { \"name\": \"setup-agent\", \"agentId\": \"setup-agent@backup-tests\", \"agentType\": \"ccm-tdd\" },\n    { \"name\": \"mock-agent\", \"agentId\": \"mock-agent@backup-tests\", \"agentType\": \"ccm-tdd\" },\n    { \"name\": \"test-writer\", \"agentId\": \"test-writer@backup-tests\", \"agentType\": \"ccm-tdd\" }\n  ]\n}"
+    },
+    {
+      "relativePath": "plugins/prettier.json",
+      "content": "{\n  \"name\": \"prettier\",\n  \"version\": \"1.2.0\",\n  \"enabled\": true,\n  \"config\": {\n    \"singleQuote\": true,\n    \"trailingComma\": \"es5\",\n    \"printWidth\": 100,\n    \"semi\": true\n  }\n}"
+    },
+    {
+      "relativePath": "plugins/eslint.json",
+      "content": "{\n  \"name\": \"eslint\",\n  \"version\": \"2.0.1\",\n  \"enabled\": true,\n  \"config\": {\n    \"extends\": [\"eslint:recommended\", \"plugin:@typescript-eslint/recommended\"],\n    \"rules\": {\n      \"no-console\": \"warn\",\n      \"@typescript-eslint/no-explicit-any\": \"error\"\n    }\n  }\n}"
+    },
+    {
+      "relativePath": "plugins/git-tools.json",
+      "content": "{\n  \"name\": \"git-tools\",\n  \"version\": \"0.9.0\",\n  \"enabled\": false,\n  \"config\": {\n    \"autoStage\": false,\n    \"signCommits\": true\n  }\n}"
+    },
+    {
+      "relativePath": "__home__/.claude.json",
+      "content": "{\n  \"mcpServers\": {\n    \"filesystem\": {\n      \"type\": \"stdio\",\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"@modelcontextprotocol/server-filesystem\", \"/home/testuser/projects\"]\n    },\n    \"github\": {\n      \"type\": \"stdio\",\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"@modelcontextprotocol/server-github\"],\n      \"env\": { \"GITHUB_PERSONAL_ACCESS_TOKEN\": \"ghp_placeholder\" }\n    },\n    \"brave-search\": {\n      \"type\": \"stdio\",\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"@modelcontextprotocol/server-brave-search\"],\n      \"env\": { \"BRAVE_API_KEY\": \"placeholder\" },\n      \"disabled\": true\n    }\n  },\n  \"projects\": {\n    \"/home/testuser/projects/my-app\": {\n      \"hasTrustDialogAccepted\": true,\n      \"mcpServers\": {\n        \"local-db\": {\n          \"type\": \"stdio\",\n          \"command\": \"node\",\n          \"args\": [\"./mcp-server/index.js\"]\n        }\n      }\n    },\n    \"/home/testuser/projects/api-service\": {\n      \"hasTrustDialogAccepted\": true\n    }\n  }\n}"
+    }
+  ]
+}
