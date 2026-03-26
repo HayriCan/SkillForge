@@ -12,4 +12,5 @@ export const ClaudeAdapter: CliAdapter = {
   settingsIsJson: true,
   mcpConfigFile: '.claude.json',
   supportsMcp: true,
+  supportedViews: null,
 };

@@ -25,4 +25,8 @@ export const CodexAdapter: CliAdapter = {
   settingsIsJson: false,
   mcpConfigFile: null,
   supportsMcp: false,
+  // Dirs confirmed in ~/.codex: skills/, sessions/
+  // rules/ maps loosely to hooks but different format — excluded for now
+  // memories/, log/, shell_snapshots/ are runtime/internal dirs
+  supportedViews: ['skills', 'sessions', 'settings'],
 };

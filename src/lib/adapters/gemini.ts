@@ -16,4 +16,6 @@ export const GeminiAdapter: CliAdapter = {
   settingsIsJson: true,
   mcpConfigFile: '.gemini/settings.json',
   supportsMcp: true,
+  // Conservative: show config (GEMINI.md), mcp, settings. Expand once ~/.gemini structure is confirmed.
+  supportedViews: ['config', 'mcp', 'settings'],
 };

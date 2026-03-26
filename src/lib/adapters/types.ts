@@ -37,4 +37,10 @@ export type CliAdapter = {
   mcpConfigFile: string | null;
   /** Whether this CLI natively supports MCP servers */
   supportsMcp: boolean;
+  /**
+   * Nav view IDs to show in the sidebar for this CLI.
+   * null = show all views (Claude default).
+   * Profiles and Settings are always shown regardless.
+   */
+  supportedViews: string[] | null;
 };

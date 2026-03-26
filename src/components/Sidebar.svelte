@@ -116,6 +116,14 @@
     refreshProfiles();
   });
 
+  const supported = $derived(activeCliAdapter?.supportedViews ?? null);
+
+  function isViewVisible(id: string): boolean {
+    // Profiles and settings are always shown
+    if (id === 'profiles' || id === 'settings') return true;
+    return supported === null || supported.includes(id);
+  }
+
   const mainItems = $derived([
     { id: 'agents',   label: t('nav.agents'),   icon: 'agents',   shortcut: '1' },
     { id: 'commands', label: t('nav.commands'),  icon: 'commands',  shortcut: '2' },
@@ -126,14 +134,14 @@
     { id: 'tasks',    label: t('nav.tasks'),     icon: 'tasks',     shortcut: '7' },
     { id: 'teams',    label: t('nav.teams'),     icon: 'teams',     shortcut: '8' },
     { id: 'todos',    label: t('nav.todos'),     icon: 'todos',     shortcut: '9' },
-  ]);
+  ].filter(item => isViewVisible(item.id)));
 
   const systemItems = $derived([
     { id: 'config',   label: t('nav.config'),    icon: 'config' },
     { id: 'mcp',      label: t('nav.mcp'),       icon: 'mcp' },
     { id: 'sessions', label: t('nav.sessions'),  icon: 'sessions' },
     { id: 'settings', label: t('nav.settings'),  icon: 'settings' },
-  ]);
+  ].filter(item => isViewVisible(item.id)));
 
   function handleAction(action: GearAction): void {
     gearOpen = false;
