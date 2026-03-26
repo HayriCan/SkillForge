@@ -24,6 +24,7 @@
   import McpServers from '../views/McpServers.svelte';
   import Backup from '../views/Backup.svelte';
   import { claudeDir, listDirFull, readFile } from '../lib/fs';
+  import { getActiveAdapter } from '../lib/adapters/index';
   import { loadSettings } from '../lib/settings';
   import { listProfiles, autoSaveDefault } from '../lib/profiles';
   import { loadMcpConfig } from '../lib/mcp';
@@ -158,9 +159,12 @@
       };
 
       const countConfigFiles = async () => {
-        // Count only root-level config files — do NOT recurse into profiles/ snapshots
+        const adapter = await getActiveAdapter();
+        const files = adapter.id === 'claude'
+          ? ['CLAUDE.md', 'MEMORY.md']
+          : adapter.instructionsFileName ? [adapter.instructionsFileName] : [];
         let count = 0;
-        for (const file of ['CLAUDE.md', 'MEMORY.md']) {
+        for (const file of files) {
           try {
             const content = await readFile(`${base}/${file}`);
             if (content.trim().length > 0) count++;

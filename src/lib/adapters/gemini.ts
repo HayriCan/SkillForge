@@ -16,6 +16,8 @@ export const GeminiAdapter: CliAdapter = {
   settingsIsJson: true,
   mcpConfigFile: '.gemini/settings.json',
   supportsMcp: true,
-  // Conservative: show config (GEMINI.md), mcp, settings. Expand once ~/.gemini structure is confirmed.
-  supportedViews: ['config', 'mcp', 'settings'],
+  // Confirmed: GEMINI.md, settings.json (MCP), skills/, extensions/
+  // Hooks exist as lifecycle scripts but not as a ~/hooks/ dir — excluded
+  // plans/tasks/agents/commands dirs do not exist in Gemini CLI
+  supportedViews: ['config', 'skills', 'mcp', 'settings'],
 };

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { claudeDir, readFile, writeFile, getCreatedAt, findFiles, deleteFile } from '../lib/fs';
+  import { getActiveAdapter } from '../lib/adapters/index';
   import { pushHistory } from '../lib/history';
   import ContextMenu from '../components/ContextMenu.svelte';
   import ConfirmModal from '../components/ConfirmModal.svelte';
@@ -58,7 +59,7 @@
             relativePath: file.relativePath,
             children: [],
             isFile: true,
-            fileType: part === 'CLAUDE.md' ? 'claude' : 'memory',
+            fileType: part === 'MEMORY.md' ? 'memory' : 'claude',
           });
         } else {
           let child = current.children.find((c) => !c.isFile && c.name === part);
@@ -163,7 +164,11 @@
     treeLoading = true;
     try {
       const base = await claudeDir();
-      const found = await findFiles(base, ['CLAUDE.md', 'MEMORY.md']);
+      const adapter = await getActiveAdapter();
+      const filesToFind = adapter.instructionsFileName
+        ? (adapter.id === 'claude' ? [adapter.instructionsFileName, 'MEMORY.md'] : [adapter.instructionsFileName])
+        : ['CLAUDE.md', 'MEMORY.md'];
+      const found = await findFiles(base, filesToFind);
       treeRoot = buildTree(found);
       onCount(found.length);
       const toExpand = new Set<string>();

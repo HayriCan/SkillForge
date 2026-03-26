@@ -20,13 +20,14 @@ export const CodexAdapter: CliAdapter = {
   description: 'OpenAI Codex CLI (~/.codex/)',
   color: 'green',
   configDirName: '.codex',
-  instructionsFileName: null,
+  // AGENTS.md is the standard instructions file for Codex (may not exist until user creates it)
+  instructionsFileName: 'AGENTS.md',
   settingsFileName: 'config.toml',
   settingsIsJson: false,
   mcpConfigFile: null,
   supportsMcp: false,
-  // Dirs confirmed in ~/.codex: skills/, sessions/
-  // rules/ maps loosely to hooks but different format — excluded for now
+  // Dirs confirmed in ~/.codex: skills/, sessions/, rules/
+  // rules/ maps loosely to hooks but uses execpolicy syntax — excluded from hooks view
   // memories/, log/, shell_snapshots/ are runtime/internal dirs
-  supportedViews: ['skills', 'sessions', 'settings'],
+  supportedViews: ['config', 'skills', 'sessions', 'settings'],
 };
