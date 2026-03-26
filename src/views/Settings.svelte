@@ -36,6 +36,10 @@
   let rawDirty = $state(false);
   let rawError = $state('');
   let activeAdapter = $state<CliAdapter>(CLI_ADAPTERS[0]);
+  let rawFileContent = $state('');
+  let rawFileDraft = $state('');
+  let rawFileDirty = $state(false);
+  let rawFileSaving = $state(false);
 
   async function load() {
     const home = await homeDir();
@@ -55,12 +59,36 @@
       tabs = [];
       settings = {};
       rawJson = '';
+      rawFileContent = '';
+      rawFileDraft = '';
+      rawFileDirty = false;
+      if (activeAdapter.settingsFileName) {
+        try {
+          rawFileContent = await readFile(`${base}/${activeAdapter.settingsFileName}`);
+          rawFileDraft = rawFileContent;
+        } catch { rawFileContent = ''; rawFileDraft = ''; }
+      }
     }
   }
 
   async function switchCli(id: CliId) {
     activeAdapter = await setActiveAdapter(id);
     await load();
+  }
+
+  async function saveRawFile() {
+    if (!activeAdapter.settingsFileName) return;
+    rawFileSaving = true;
+    try {
+      const base = await claudeDir();
+      await writeFile(`${base}/${activeAdapter.settingsFileName}`, rawFileDraft);
+      rawFileContent = rawFileDraft;
+      rawFileDirty = false;
+    } catch (e) {
+      console.error('[Settings] Failed to save raw file:', e);
+    } finally {
+      rawFileSaving = false;
+    }
   }
 
   async function savePath() {
@@ -211,18 +239,43 @@
   </div>
 
   {#if !activeAdapter.settingsIsJson}
-    <!-- Non-JSON settings (e.g. Codex config.toml) -->
-    <div class="flex items-start gap-3 p-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-2)] mb-5">
-      <svg class="w-4 h-4 text-[var(--text-ghost)] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-      </svg>
-      <div>
-        <p class="text-[12px] text-[var(--text-secondary)] font-medium">{activeAdapter.label} settings are not JSON</p>
-        <p class="text-[11px] text-[var(--text-ghost)] mt-0.5">
-          Config is stored in <span class="font-mono">{activeAdapter.configDirName}/{activeAdapter.settingsFileName}</span> (TOML format) — edit via terminal.
-        </p>
+    <!-- Non-JSON settings (e.g. Codex config.toml) — read-only viewer -->
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-[0.15em]">
+          {activeAdapter.settingsFileName ?? 'Config'}
+        </span>
+        {#if rawFileDirty}
+          <span class="text-[9px] px-1.5 py-0.5 rounded bg-[var(--warning)]/10 text-[var(--warning)] font-semibold">unsaved</span>
+        {/if}
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] text-[var(--text-ghost)] font-mono">{activeAdapter.configDirName}/{activeAdapter.settingsFileName}</span>
+        {#if rawFileDirty}
+          <button
+            onclick={saveRawFile}
+            disabled={rawFileSaving}
+            class="px-2.5 py-1 bg-[var(--accent-dim)] hover:bg-[var(--accent)] rounded text-[11px] text-[var(--surface-0)] font-semibold transition-colors disabled:opacity-50"
+          >{rawFileSaving ? 'Saving…' : 'Save'}</button>
+          <button
+            onclick={() => { rawFileDraft = rawFileContent; rawFileDirty = false; }}
+            class="px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+          >Discard</button>
+        {/if}
       </div>
     </div>
+    {#if rawFileContent !== undefined}
+      <textarea
+        bind:value={rawFileDraft}
+        oninput={() => rawFileDirty = rawFileDraft !== rawFileContent}
+        spellcheck={false}
+        class="flex-1 w-full resize-none text-[12px] font-mono text-[var(--text-secondary)] bg-[var(--surface-2)] border border-[var(--border-subtle)] rounded-lg p-4 leading-relaxed outline-none focus:border-[var(--accent-dim)] transition-colors min-h-[300px]"
+      ></textarea>
+    {:else}
+      <div class="flex items-center justify-center py-12 text-[13px] text-[var(--text-ghost)]">
+        {activeAdapter.settingsFileName} not found
+      </div>
+    {/if}
   {:else}
     <!-- Tab bar -->
     <div class="flex gap-0 border-b border-[var(--border-subtle)] mb-5">
