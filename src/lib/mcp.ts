@@ -1,5 +1,6 @@
 import { readFile, writeFile, claudeDir } from './fs';
 import { homeDir } from '@tauri-apps/api/path';
+import { getActiveAdapter } from './adapters/index';
 
 export type McpServerType = 'stdio' | 'sse' | 'http';
 
@@ -27,9 +28,21 @@ export type ScopedMcpEntry = {
   projectPath?: string;
 };
 
+/**
+ * Returns the path of the primary MCP config file for the active CLI adapter.
+ * Claude Code: ~/.claude.json
+ * Gemini CLI:  ~/.gemini/settings.json
+ * Codex CLI:   null (MCP not supported — callers should check adapter.supportsMcp)
+ */
 async function claudeJsonPath(): Promise<string> {
   const home = await homeDir();
-  return `${home.endsWith('/') ? home.slice(0, -1) : home}/.claude.json`;
+  const h = home.endsWith('/') ? home.slice(0, -1) : home;
+  const adapter = await getActiveAdapter();
+  if (!adapter.mcpConfigFile) {
+    // Return a non-existent path so reads gracefully fail and writes are no-ops
+    return `${h}/${adapter.configDirName}/.no-mcp`;
+  }
+  return `${h}/${adapter.mcpConfigFile}`;
 }
 
 /**

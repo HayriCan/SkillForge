@@ -9,7 +9,13 @@ import {
 } from "@tauri-apps/plugin-fs";
 import { homeDir } from "@tauri-apps/api/path";
 import { loadAppConfig } from "./app-config";
+import { getAdapter } from "./adapters/index";
 
+/**
+ * Returns the active CLI's config directory path.
+ * Respects a manual override in app-config (claudeDir field) when set.
+ * Otherwise uses the active adapter's configDirName under $HOME.
+ */
 export async function claudeDir(): Promise<string> {
   const config = await loadAppConfig();
   if (config.claudeDir) {
@@ -18,7 +24,8 @@ export async function claudeDir(): Promise<string> {
   }
   const home = await homeDir();
   const base = home.endsWith("/") ? home.slice(0, -1) : home;
-  return `${base}/.claude`;
+  const adapter = getAdapter(config.activeCli);
+  return `${base}/${adapter.configDirName}`;
 }
 
 export async function readFile(path: string): Promise<string> {

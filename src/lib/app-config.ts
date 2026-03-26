@@ -6,8 +6,12 @@ import {
 } from "@tauri-apps/plugin-fs";
 import { appDataDir } from "@tauri-apps/api/path";
 
+import type { CliId } from './adapters/types';
+
 export type AppConfig = {
   claudeDir?: string;
+  /** Active CLI adapter id; defaults to 'claude' when absent */
+  activeCli?: CliId;
 };
 
 let configCache: AppConfig | null = null;

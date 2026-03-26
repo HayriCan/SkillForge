@@ -19,12 +19,15 @@
   import EmptyState from '../components/EmptyState.svelte';
   import { addToast } from '../lib/toast.svelte';
   import { validateServerName } from '../lib/validation';
+  import { getActiveAdapter } from '../lib/adapters/index';
+  import type { CliAdapter } from '../lib/adapters/types';
 
   const { onCount } = $props<{ onCount: (n: number) => void }>();
 
   let entries = $state<ScopedMcpEntry[]>([]);
   let selected = $state<ScopedMcpEntry | null>(null);
   let loading = $state(true);
+  let adapter = $state<CliAdapter | null>(null);
   let trustEntries = $state<ProjectTrustEntry[]>([]);
   let trustLoading = $state(false);
   let trustingAll = $state(false);
@@ -48,6 +51,13 @@
 
   async function load() {
     loading = true;
+    adapter = await getActiveAdapter();
+    if (!adapter.supportsMcp) {
+      entries = [];
+      onCount(0);
+      loading = false;
+      return;
+    }
     const [allEntries, trust] = await Promise.all([loadAllMcpEntries(), loadProjectTrust()]);
     entries = allEntries;
     trustEntries = trust;
@@ -237,6 +247,12 @@
         <div class="flex items-center justify-center py-12">
           <span class="text-[13px] text-[var(--text-ghost)] animate-pulse-dot">Loading...</span>
         </div>
+      {:else if adapter && !adapter.supportsMcp}
+        <EmptyState
+          icon="mcp"
+          title="MCP not supported"
+          description="{adapter.label} does not support MCP servers"
+        />
       {:else if entries.length === 0 && !showAdd}
         <EmptyState
           icon="mcp"

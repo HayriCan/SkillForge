@@ -5,9 +5,13 @@
   import { getTheme, setTheme, type Theme } from '../lib/theme.svelte';
   import { addToast } from '../lib/toast.svelte';
   import { t } from '../lib/i18n.svelte';
+  import { getActiveAdapter } from '../lib/adapters/index';
+  import type { CliAdapter } from '../lib/adapters/types';
 
   let appVersion = $state('');
+  let activeCliAdapter = $state<CliAdapter | null>(null);
   getVersion().then(v => appVersion = v);
+  getActiveAdapter().then(a => activeCliAdapter = a);
 
   type GearAction = 'about' | 'check-updates' | 'feedback' | 'homepage' | 'preferences' | 'toggle-devtools' | 'export' | 'import';
 
@@ -245,7 +249,15 @@
 
   <!-- Footer -->
   <div class="px-3 py-2.5 border-t border-[var(--border-default)] flex items-center justify-between">
-    <span class="text-[10px] text-[var(--text-ghost)] font-mono">v{appVersion || '...'}</span>
+    <div class="flex items-center gap-1.5">
+      <span class="text-[10px] text-[var(--text-ghost)] font-mono">v{appVersion || '...'}</span>
+      {#if activeCliAdapter && activeCliAdapter.id !== 'claude'}
+        <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-md
+          {activeCliAdapter.id === 'codex' ? 'bg-green-500/15 text-green-400' : 'bg-blue-500/15 text-blue-400'}">
+          {activeCliAdapter.label}
+        </span>
+      {/if}
+    </div>
     <div class="flex items-center gap-0.5">
       <button
         onclick={cycleTheme}
