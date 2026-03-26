@@ -18,7 +18,9 @@
     const { setActiveAdapter } = await import('../lib/adapters/index');
     activeCliAdapter = await setActiveAdapter(id);
     cliPickerOpen = false;
-    // Dispatch a custom event so the active view can reload
+    // Clear active profile — it belongs to the previous CLI's profile dir
+    localStorage.removeItem('sf-active-profile');
+    activeProfile = null;
     window.dispatchEvent(new CustomEvent('cli-changed', { detail: { id } }));
   }
 
@@ -56,7 +58,19 @@
 
   onMount(() => {
     if (menuPortal) document.body.appendChild(menuPortal);
-    return () => { if (menuPortal?.parentNode === document.body) document.body.removeChild(menuPortal); };
+
+    const onCliChange = async () => {
+      activeCliAdapter = await getActiveAdapter();
+      // Active profile belongs to the previous CLI — reset for the new one
+      activeProfile = getActiveProfile();
+      await refreshProfiles();
+    };
+    window.addEventListener('cli-changed', onCliChange);
+
+    return () => {
+      if (menuPortal?.parentNode === document.body) document.body.removeChild(menuPortal);
+      window.removeEventListener('cli-changed', onCliChange);
+    };
   });
 
   const themeLabel = $derived(
@@ -160,50 +174,7 @@
   <!-- Brand header -->
   <div class="px-4 pt-4 pb-2 flex items-center gap-2.5">
     <img src="/app-icon.png" alt="Skill Forge" class="w-5 h-5 shrink-0" />
-    <span class="text-[12px] font-semibold text-[var(--text-secondary)] tracking-tight flex-1">Skill Forge</span>
-
-    <!-- CLI picker -->
-    {#if activeCliAdapter}
-      <div class="relative">
-        <button
-          onclick={() => cliPickerOpen = !cliPickerOpen}
-          title="Switch active CLI"
-          class="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors duration-100
-                 {cliPickerOpen ? 'bg-[var(--surface-0)] text-[var(--text-secondary)]' : 'text-[var(--text-ghost)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-0)]'}"
-        >
-          <span class="w-1.5 h-1.5 rounded-full shrink-0
-            {activeCliAdapter.id === 'claude' ? 'bg-orange-400' : activeCliAdapter.id === 'codex' ? 'bg-green-400' : 'bg-blue-400'}"></span>
-          {activeCliAdapter.id === 'claude' ? 'Claude' : activeCliAdapter.label}
-          <svg class="w-2.5 h-2.5 transition-transform {cliPickerOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
-          </svg>
-        </button>
-
-        {#if cliPickerOpen}
-          <div class="absolute right-0 top-full mt-1 w-44 rounded border border-[var(--border-default)] bg-[var(--surface-0)] shadow-lg shadow-black/10 z-50 overflow-hidden animate-fade-in">
-            {#each CLI_ADAPTERS as adapter}
-              <button
-                onclick={() => switchCliFromSidebar(adapter.id)}
-                class="w-full flex items-center gap-2 px-2.5 py-1.5 text-left transition-colors duration-100
-                       {activeCliAdapter.id === adapter.id
-                         ? 'bg-[var(--accent-subtle)] text-[var(--accent)]'
-                         : 'text-[var(--text-secondary)] hover:bg-[var(--surface-2)]'}"
-              >
-                <span class="w-1.5 h-1.5 rounded-full shrink-0
-                  {adapter.id === 'claude' ? 'bg-orange-400' : adapter.id === 'codex' ? 'bg-green-400' : 'bg-blue-400'}"></span>
-                <div class="flex-1 min-w-0">
-                  <div class="text-[11px] font-medium truncate">{adapter.label}</div>
-                  <div class="text-[10px] text-[var(--text-ghost)] truncate">{adapter.configDirName}</div>
-                </div>
-                {#if activeCliAdapter.id === adapter.id}
-                  <span class="text-[9px] text-[var(--success)] font-semibold shrink-0">✓</span>
-                {/if}
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    {/if}
+    <span class="text-[12px] font-semibold text-[var(--text-secondary)] tracking-tight">Skill Forge</span>
   </div>
 
   <!-- Profile Switcher -->
@@ -306,6 +277,53 @@
       {@render navItem(item)}
     {/each}
   </nav>
+
+  <!-- CLI Switcher -->
+  {#if activeCliAdapter}
+    <div class="px-2.5 py-2 border-t border-[var(--border-default)] relative">
+      <button
+        onclick={() => cliPickerOpen = !cliPickerOpen}
+        class="w-full flex items-center gap-2 px-2.5 py-1.5 rounded border transition-all duration-150 text-left
+               {cliPickerOpen
+                 ? 'bg-[var(--surface-0)] border-[var(--border-accent)]'
+                 : 'bg-[var(--surface-0)]/60 border-[var(--border-subtle)] hover:bg-[var(--surface-0)] hover:border-[var(--border-default)]'}"
+      >
+        <span class="w-2 h-2 rounded-full shrink-0
+          {activeCliAdapter.id === 'claude' ? 'bg-orange-400' : activeCliAdapter.id === 'codex' ? 'bg-green-400' : 'bg-blue-400'}"></span>
+        <span class="flex-1 text-[12px] font-medium text-[var(--text-secondary)] truncate">{activeCliAdapter.label}</span>
+        <span class="text-[10px] text-[var(--text-ghost)] font-mono shrink-0">{activeCliAdapter.configDirName}</span>
+        <svg class="w-3 h-3 text-[var(--text-ghost)] transition-transform duration-150 shrink-0 {cliPickerOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+
+      {#if cliPickerOpen}
+        <div class="absolute bottom-full left-2.5 right-2.5 mb-1 rounded border border-[var(--border-default)] bg-[var(--surface-0)] shadow-lg shadow-black/10 z-50 overflow-hidden animate-fade-in">
+          {#each CLI_ADAPTERS as adapter}
+            <button
+              onclick={() => switchCliFromSidebar(adapter.id)}
+              class="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors duration-100
+                     {activeCliAdapter.id === adapter.id
+                       ? 'bg-[var(--accent-subtle)] text-[var(--accent)]'
+                       : 'text-[var(--text-secondary)] hover:bg-[var(--surface-2)]'}"
+            >
+              <span class="w-2 h-2 rounded-full shrink-0
+                {adapter.id === 'claude' ? 'bg-orange-400' : adapter.id === 'codex' ? 'bg-green-400' : 'bg-blue-400'}"></span>
+              <div class="flex-1 min-w-0">
+                <div class="text-[12px] font-medium truncate">{adapter.label}</div>
+                <div class="text-[10px] text-[var(--text-ghost)] font-mono truncate">{adapter.configDirName}</div>
+              </div>
+              {#if activeCliAdapter.id === adapter.id}
+                <svg class="w-3.5 h-3.5 text-[var(--success)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                </svg>
+              {/if}
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   <!-- Footer -->
   <div class="px-3 py-2.5 border-t border-[var(--border-default)] flex items-center justify-between">
