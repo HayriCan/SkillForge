@@ -50,6 +50,12 @@
     loadAllCounts();
     profileListVersion++;
   }
+
+  function handleCliChange() {
+    counts = {};
+    viewKey++;
+    loadAllCounts();
+  }
   let showPalette = $state(false);
   let showOnboarding = $state(false);
   let showAbout = $state(false);
@@ -228,6 +234,8 @@
     if (!localStorage.getItem('sf-onboarded')) {
       showOnboarding = true;
     }
+    window.addEventListener('cli-changed', handleCliChange);
+    return () => window.removeEventListener('cli-changed', handleCliChange);
   });
 
   const cleanupShortcuts = registerShortcuts({

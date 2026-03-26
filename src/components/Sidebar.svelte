@@ -5,13 +5,22 @@
   import { getTheme, setTheme, type Theme } from '../lib/theme.svelte';
   import { addToast } from '../lib/toast.svelte';
   import { t } from '../lib/i18n.svelte';
-  import { getActiveAdapter } from '../lib/adapters/index';
-  import type { CliAdapter } from '../lib/adapters/types';
+  import { getActiveAdapter, CLI_ADAPTERS } from '../lib/adapters/index';
+  import type { CliAdapter, CliId } from '../lib/adapters/types';
 
   let appVersion = $state('');
   let activeCliAdapter = $state<CliAdapter | null>(null);
+  let cliPickerOpen = $state(false);
   getVersion().then(v => appVersion = v);
   getActiveAdapter().then(a => activeCliAdapter = a);
+
+  async function switchCliFromSidebar(id: CliId): Promise<void> {
+    const { setActiveAdapter } = await import('../lib/adapters/index');
+    activeCliAdapter = await setActiveAdapter(id);
+    cliPickerOpen = false;
+    // Dispatch a custom event so the active view can reload
+    window.dispatchEvent(new CustomEvent('cli-changed', { detail: { id } }));
+  }
 
   type GearAction = 'about' | 'check-updates' | 'feedback' | 'homepage' | 'preferences' | 'toggle-devtools' | 'export' | 'import';
 
@@ -142,8 +151,51 @@
 
   <!-- Brand header -->
   <div class="px-4 pt-4 pb-2 flex items-center gap-2.5">
-    <img src="/app-icon.png" alt="Skill Forge" class="w-5 h-5" />
-    <span class="text-[12px] font-semibold text-[var(--text-secondary)] tracking-tight">Skill Forge</span>
+    <img src="/app-icon.png" alt="Skill Forge" class="w-5 h-5 shrink-0" />
+    <span class="text-[12px] font-semibold text-[var(--text-secondary)] tracking-tight flex-1">Skill Forge</span>
+
+    <!-- CLI picker -->
+    {#if activeCliAdapter}
+      <div class="relative">
+        <button
+          onclick={() => cliPickerOpen = !cliPickerOpen}
+          title="Switch active CLI"
+          class="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors duration-100
+                 {cliPickerOpen ? 'bg-[var(--surface-0)] text-[var(--text-secondary)]' : 'text-[var(--text-ghost)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-0)]'}"
+        >
+          <span class="w-1.5 h-1.5 rounded-full shrink-0
+            {activeCliAdapter.id === 'claude' ? 'bg-orange-400' : activeCliAdapter.id === 'codex' ? 'bg-green-400' : 'bg-blue-400'}"></span>
+          {activeCliAdapter.id === 'claude' ? 'Claude' : activeCliAdapter.label}
+          <svg class="w-2.5 h-2.5 transition-transform {cliPickerOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+
+        {#if cliPickerOpen}
+          <div class="absolute right-0 top-full mt-1 w-44 rounded border border-[var(--border-default)] bg-[var(--surface-0)] shadow-lg shadow-black/10 z-50 overflow-hidden animate-fade-in">
+            {#each CLI_ADAPTERS as adapter}
+              <button
+                onclick={() => switchCliFromSidebar(adapter.id)}
+                class="w-full flex items-center gap-2 px-2.5 py-1.5 text-left transition-colors duration-100
+                       {activeCliAdapter.id === adapter.id
+                         ? 'bg-[var(--accent-subtle)] text-[var(--accent)]'
+                         : 'text-[var(--text-secondary)] hover:bg-[var(--surface-2)]'}"
+              >
+                <span class="w-1.5 h-1.5 rounded-full shrink-0
+                  {adapter.id === 'claude' ? 'bg-orange-400' : adapter.id === 'codex' ? 'bg-green-400' : 'bg-blue-400'}"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="text-[11px] font-medium truncate">{adapter.label}</div>
+                  <div class="text-[10px] text-[var(--text-ghost)] truncate">{adapter.configDirName}</div>
+                </div>
+                {#if activeCliAdapter.id === adapter.id}
+                  <span class="text-[9px] text-[var(--success)] font-semibold shrink-0">✓</span>
+                {/if}
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    {/if}
   </div>
 
   <!-- Profile Switcher -->
@@ -249,15 +301,7 @@
 
   <!-- Footer -->
   <div class="px-3 py-2.5 border-t border-[var(--border-default)] flex items-center justify-between">
-    <div class="flex items-center gap-1.5">
-      <span class="text-[10px] text-[var(--text-ghost)] font-mono">v{appVersion || '...'}</span>
-      {#if activeCliAdapter && activeCliAdapter.id !== 'claude'}
-        <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-md
-          {activeCliAdapter.id === 'codex' ? 'bg-green-500/15 text-green-400' : 'bg-blue-500/15 text-blue-400'}">
-          {activeCliAdapter.label}
-        </span>
-      {/if}
-    </div>
+    <span class="text-[10px] text-[var(--text-ghost)] font-mono">v{appVersion || '...'}</span>
     <div class="flex items-center gap-0.5">
       <button
         onclick={cycleTheme}

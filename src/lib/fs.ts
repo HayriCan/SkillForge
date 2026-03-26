@@ -41,6 +41,7 @@ export async function deleteFile(path: string): Promise<void> {
 }
 
 export async function listDir(path: string): Promise<string[]> {
+  if (!(await exists(path))) return [];
   const entries = await readDir(path);
   return entries.map((e) => e.name).filter(Boolean) as string[];
 }
@@ -48,6 +49,7 @@ export async function listDir(path: string): Promise<string[]> {
 export async function listDirFull(
   path: string,
 ): Promise<{ name: string; isDir: boolean }[]> {
+  if (!(await exists(path))) return [];
   const entries = await readDir(path);
   return entries.map((e) => ({
     name: e.name ?? "",
