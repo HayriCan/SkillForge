@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getVersion } from '@tauri-apps/api/app';
-  import { getActiveProfile, listProfiles, loadProfile, switchToDefault, type Profile } from '../lib/profiles';
+  import { getActiveProfile, listProfiles, loadProfile, switchToDefault, createFromTemplate, type Profile } from '../lib/profiles';
+  import { estimateCurrentTokens, formatTokens } from '../lib/tokenEstimator';
   import { getTheme, setTheme, type Theme } from '../lib/theme.svelte';
   import { addToast } from '../lib/toast.svelte';
   import { t } from '../lib/i18n.svelte';
@@ -26,6 +27,8 @@
   let profilesOpen = $state(false);
   let gearOpen = $state(false);
   let switching = $state(false);
+  let currentTokens = $state<number | null>(null);
+  let minimalModeLoading = $state(false);
   let gearBtnEl = $state<HTMLButtonElement | null>(null);
   let menuPos = $state({ left: 0, bottom: 0 });
   let menuPortal = $state<HTMLDivElement | null>(null);
@@ -56,6 +59,27 @@
   async function refreshProfiles(): Promise<void> {
     profiles = await listProfiles();
     activeProfile = getActiveProfile();
+    estimateCurrentTokens().then((est) => { currentTokens = est.total; }).catch(() => {});
+  }
+
+  async function activateMinimalMode(): Promise<void> {
+    minimalModeLoading = true;
+    profilesOpen = false;
+    try {
+      const existing = profiles.find((p) => p.name === '__minimal_auto__');
+      if (!existing) {
+        await createFromTemplate('__minimal_auto__', 'Auto-generated minimal profile', 'minimal');
+      }
+      await loadProfile('__minimal_auto__');
+      activeProfile = '__minimal_auto__';
+      addToast('Minimal Mode activated', 'success');
+      onProfileSwitch?.();
+      await refreshProfiles();
+    } catch (e) {
+      addToast(`Failed to activate Minimal Mode: ${e}`, 'error');
+    } finally {
+      minimalModeLoading = false;
+    }
   }
 
   async function switchProfile(name: string): Promise<void> {
@@ -131,6 +155,9 @@
       <span class="flex-1 text-[12px] font-medium truncate text-[var(--text-secondary)]">
         {activeProfile ?? t('default')}
       </span>
+      {#if currentTokens !== null}
+        <span class="text-[9px] font-mono text-[var(--text-ghost)] shrink-0">~{formatTokens(currentTokens)}</span>
+      {/if}
       <svg class="w-3 h-3 text-[var(--text-ghost)] transition-transform duration-150 {profilesOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
       </svg>
@@ -172,12 +199,22 @@
           {/each}
         {/if}
         <div class="border-t border-[var(--border-subtle)]">
-          <button
-            onclick={() => { profilesOpen = false; onSelect('profiles'); }}
-            class="w-full px-2.5 py-1.5 text-[11px] text-[var(--text-ghost)] hover:text-[var(--accent)] hover:bg-[var(--accent-subtle)] transition-colors duration-100 text-left"
-          >
-            {t('manage_profiles')}
-          </button>
+          <div class="flex items-center">
+            <button
+              onclick={() => { profilesOpen = false; onSelect('profiles'); }}
+              class="flex-1 px-2.5 py-1.5 text-[11px] text-[var(--text-ghost)] hover:text-[var(--accent)] hover:bg-[var(--accent-subtle)] transition-colors duration-100 text-left"
+            >
+              {t('manage_profiles')}
+            </button>
+            <button
+              onclick={activateMinimalMode}
+              disabled={minimalModeLoading}
+              title="Activate Minimal Mode — switches to lowest token profile"
+              class="px-2 py-1.5 text-[10px] font-medium text-[var(--warning,#f59e0b)] hover:bg-[var(--surface-2)] transition-colors duration-100 disabled:opacity-50 shrink-0"
+            >
+              {minimalModeLoading ? '...' : '⚡'}
+            </button>
+          </div>
         </div>
       </div>
     {/if}

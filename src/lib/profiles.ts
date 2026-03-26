@@ -2,11 +2,32 @@ import { readFile, writeFile, listDirFull, ensureDir, deleteFile, claudeDir, fin
 import { loadSettings, saveSettings, type Settings } from './settings';
 import { loadMcpConfig, saveMcpConfig } from './mcp';
 
+export type TemplateType = 'coding' | 'writing' | 'research' | 'minimal' | 'ai-setup';
+
+export type ProfileTemplate = {
+  id: TemplateType;
+  label: string;
+  description: string;
+  dirs: string[];
+  rootFiles: string[];
+  includeSettings: boolean;
+  includeMcp: boolean;
+};
+
+export const PROFILE_TEMPLATES: ProfileTemplate[] = [
+  { id: 'coding',   label: 'Coding',   description: 'Agents, commands, hooks, skills + CLAUDE.md + MCP',     dirs: ['agents','commands','hooks','skills'], rootFiles: ['CLAUDE.md'],             includeSettings: true, includeMcp: true  },
+  { id: 'writing',  label: 'Writing',  description: 'Commands, skills + CLAUDE.md — low token footprint',    dirs: ['commands','skills'],                 rootFiles: ['CLAUDE.md'],             includeSettings: true, includeMcp: false },
+  { id: 'research', label: 'Research', description: 'Plans, skills, commands + CLAUDE.md + MEMORY.md + MCP', dirs: ['plans','skills','commands'],         rootFiles: ['CLAUDE.md','MEMORY.md'], includeSettings: true, includeMcp: true  },
+  { id: 'minimal',  label: 'Minimal',  description: 'Only CLAUDE.md + settings — lowest token usage',        dirs: [],                                    rootFiles: ['CLAUDE.md'],             includeSettings: true, includeMcp: false },
+  { id: 'ai-setup', label: 'AI Setup', description: 'Settings + MCP servers only — for agent testing',       dirs: [],                                    rootFiles: [],                        includeSettings: true, includeMcp: true  },
+];
+
 export type Profile = {
   name: string;
   description?: string;
   createdAt: string;
   isBlank?: boolean;
+  templateType?: TemplateType;
 };
 
 export type TrashedProfile = Profile & {
@@ -198,6 +219,64 @@ export async function createEmptyProfile(name: string, description?: string): Pr
 }
 
 /**
+ * Create a profile from a predefined template: only snapshots dirs/files defined in the template.
+ * Remaining SNAPSHOT_DIRS are created as empty folders to maintain loadProfile compatibility.
+ */
+export async function createFromTemplate(
+  name: string,
+  description: string | undefined,
+  templateId: TemplateType,
+): Promise<void> {
+  const template = PROFILE_TEMPLATES.find((t) => t.id === templateId);
+  if (!template) throw new Error(`Unknown template: ${templateId}`);
+
+  const base = await claudeDir();
+  const dir = await profilesDir();
+  const profileDir = `${dir}/${name}`;
+  await ensureDir(profileDir);
+
+  // Settings
+  if (template.includeSettings) {
+    const settings = await loadSettings();
+    await writeFile(`${profileDir}/settings.json`, JSON.stringify(settings, null, 2));
+  } else {
+    await writeFile(`${profileDir}/settings.json`, JSON.stringify({}, null, 2));
+  }
+
+  // Root files (CLAUDE.md, MEMORY.md)
+  for (const file of SNAPSHOT_ROOT_FILES) {
+    if (template.rootFiles.includes(file)) {
+      try {
+        const content = await readFile(`${base}/${file}`);
+        await writeFile(`${profileDir}/${file}`, content);
+      } catch {}
+    }
+  }
+
+  // Dirs: copy those in template, create empty for the rest
+  for (const dirName of SNAPSHOT_DIRS) {
+    if (template.dirs.includes(dirName)) {
+      await copyDirSnapshot(`${base}/${dirName}`, `${profileDir}/${dirName}`);
+    } else {
+      await ensureDir(`${profileDir}/${dirName}`);
+    }
+  }
+
+  // MCP
+  if (template.includeMcp) {
+    try {
+      const mcp = await loadMcpConfig();
+      await writeFile(`${profileDir}/mcp-servers.json`, JSON.stringify(mcp, null, 2));
+    } catch {}
+  } else {
+    await writeFile(`${profileDir}/mcp-servers.json`, JSON.stringify({ mcpServers: {} }, null, 2));
+  }
+
+  const meta: Profile = { name, description, createdAt: new Date().toISOString(), templateType: templateId };
+  await writeFile(`${profileDir}/profile.json`, JSON.stringify(meta, null, 2));
+}
+
+/**
  * Restore a profile: overwrite current Claude config with the snapshot.
  * Auto-saves current state as Default before the very first profile switch.
  * Also saves the currently active named profile before switching away from it.
@@ -205,18 +284,25 @@ export async function createEmptyProfile(name: string, description?: string): Pr
 export async function loadProfile(name: string): Promise<void> {
   await autoSaveDefault();
 
-  // Save current active named profile's live state before switching away
+  // Save current live state before switching away — named profile or Default
   const currentProfile = getActiveProfile();
+  const dir = await profilesDir();
   if (currentProfile) {
-    const dir = await profilesDir();
     await snapshotCurrentStateTo(`${dir}/${currentProfile}`);
+  } else {
+    // Keep __default__ snapshot current so switching back preserves recent changes
+    await snapshotCurrentStateTo(`${dir}/${DEFAULT_SNAPSHOT}`);
   }
   const base = await claudeDir();
-  const dir = await profilesDir();
   const profileDir = `${dir}/${name}`;
 
   const settingsRaw = await readFile(`${profileDir}/settings.json`);
-  await saveSettings(JSON.parse(settingsRaw) as Settings);
+  const settingsToRestore = JSON.parse(settingsRaw) as Settings;
+  // MCPs are managed separately via mcp-servers.json; strip any mcpServers key
+  // from settings to prevent stale profile data from overwriting live MCP config
+  // (on macOS, `claude mcp add --scope user` writes to settings.json)
+  delete settingsToRestore.mcpServers;
+  await saveSettings(settingsToRestore);
 
   for (const file of SNAPSHOT_ROOT_FILES) {
     try {
@@ -378,7 +464,9 @@ export async function switchToDefault(): Promise<void> {
   if (exists !== null) {
     try {
       const settingsRaw = await readFile(`${defaultDir}/settings.json`);
-      await saveSettings(JSON.parse(settingsRaw) as Settings);
+      const settingsToRestore = JSON.parse(settingsRaw) as Settings;
+      delete settingsToRestore.mcpServers;
+      await saveSettings(settingsToRestore);
     } catch {}
     for (const file of SNAPSHOT_ROOT_FILES) {
       try {
