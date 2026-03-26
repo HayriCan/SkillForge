@@ -17,10 +17,18 @@ export type CliAdapter = {
   color: string;
   /** Directory name under home (e.g. ".claude", ".codex", ".gemini") */
   configDirName: string;
-  /** Name of the root instructions/system-prompt file (e.g. "CLAUDE.md") */
-  instructionsFileName: string;
-  /** Name of the JSON settings file inside configDir; null if not applicable */
+  /**
+   * Name of the root instructions/system-prompt file (e.g. "CLAUDE.md").
+   * null if the CLI does not use a single root instructions file.
+   */
+  instructionsFileName: string | null;
+  /**
+   * Name of the settings/config file inside configDir.
+   * null if not applicable. If the file is not JSON (e.g. TOML), set settingsIsJson = false.
+   */
   settingsFileName: string | null;
+  /** Whether the settings file is JSON-parseable (false = TOML or other format) */
+  settingsIsJson: boolean;
   /**
    * Path of the file (relative to home) that contains the top-level
    * `mcpServers` object. null when MCP is not supported by this CLI.

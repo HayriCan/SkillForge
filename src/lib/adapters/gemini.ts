@@ -13,6 +13,7 @@ export const GeminiAdapter: CliAdapter = {
   configDirName: '.gemini',
   instructionsFileName: 'GEMINI.md',
   settingsFileName: 'settings.json',
+  settingsIsJson: true,
   mcpConfigFile: '.gemini/settings.json',
   supportsMcp: true,
 };

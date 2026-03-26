@@ -45,11 +45,17 @@
     const base = await claudeDir();
     claudePath = base;
     basePath = base;
-    tabs = [
-      { label: 'Global Settings', path: `${base}/settings.json` },
-      { label: 'Local Settings', path: `${base}/settings.local.json` },
-    ];
-    await loadTab(activeTab);
+    if (activeAdapter.settingsFileName && activeAdapter.settingsIsJson) {
+      tabs = [
+        { label: 'Global Settings', path: `${base}/${activeAdapter.settingsFileName}` },
+        { label: 'Local Settings', path: `${base}/settings.local.json` },
+      ];
+      await loadTab(activeTab);
+    } else {
+      tabs = [];
+      settings = {};
+      rawJson = '';
+    }
   }
 
   async function switchCli(id: CliId) {
@@ -204,19 +210,35 @@
     {/if}
   </div>
 
-  <!-- Tab bar -->
-  <div class="flex gap-0 border-b border-[var(--border-subtle)] mb-5">
-    {#each tabs as tab, i}
-      <button
-        onclick={() => loadTab(i)}
-        class="px-5 py-2.5 text-[13px] transition-all duration-200 border-b-2 -mb-px relative
-               {activeTab === i ? 'text-[var(--text-primary)] border-[var(--accent)]' : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)]'}"
-      >
-        {tab.label}
-      </button>
-    {/each}
-  </div>
+  {#if !activeAdapter.settingsIsJson}
+    <!-- Non-JSON settings (e.g. Codex config.toml) -->
+    <div class="flex items-start gap-3 p-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-2)] mb-5">
+      <svg class="w-4 h-4 text-[var(--text-ghost)] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <div>
+        <p class="text-[12px] text-[var(--text-secondary)] font-medium">{activeAdapter.label} settings are not JSON</p>
+        <p class="text-[11px] text-[var(--text-ghost)] mt-0.5">
+          Config is stored in <span class="font-mono">{activeAdapter.configDirName}/{activeAdapter.settingsFileName}</span> (TOML format) — edit via terminal.
+        </p>
+      </div>
+    </div>
+  {:else}
+    <!-- Tab bar -->
+    <div class="flex gap-0 border-b border-[var(--border-subtle)] mb-5">
+      {#each tabs as tab, i}
+        <button
+          onclick={() => loadTab(i)}
+          class="px-5 py-2.5 text-[13px] transition-all duration-200 border-b-2 -mb-px relative
+                 {activeTab === i ? 'text-[var(--text-primary)] border-[var(--accent)]' : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)]'}"
+        >
+          {tab.label}
+        </button>
+      {/each}
+    </div>
+  {/if}
 
+  {#if activeAdapter.settingsIsJson}
   <!-- View mode toggle -->
   <div class="flex items-center gap-3 mb-5">
     <div class="relative flex-1">
@@ -290,5 +312,6 @@
 
       <UnknownSection unknownFields={unknownFields()} onPatch={patchAndReload} />
     </div>
+  {/if}
   {/if}
 </div>

@@ -9,6 +9,7 @@ export const ClaudeAdapter: CliAdapter = {
   configDirName: '.claude',
   instructionsFileName: 'CLAUDE.md',
   settingsFileName: 'settings.json',
+  settingsIsJson: true,
   mcpConfigFile: '.claude.json',
   supportsMcp: true,
 };
