@@ -325,14 +325,6 @@
         <div class="flex items-center justify-center py-12">
           <span class="text-[13px] text-[var(--text-ghost)] animate-pulse-dot">Loading...</span>
         </div>
-      {:else if profiles.length === 0 && !showCreate}
-        <EmptyState
-          icon="profiles"
-          title="No profiles yet"
-          description="Save your current config as a named profile to switch between setups"
-          actionLabel="Create Profile"
-          onAction={() => { showCreate = true; }}
-        />
       {:else}
         <!-- Default (live state) entry -->
         <button
@@ -367,6 +359,16 @@
             </div>
           {/if}
         </button>
+
+        {#if profiles.length === 0 && !showCreate}
+          <div class="px-4 py-4 text-center border-b border-[var(--border-subtle)]">
+            <p class="text-[11px] text-[var(--text-ghost)] leading-relaxed">Save your current config as a named profile to switch between setups</p>
+            <button
+              onclick={() => { showCreate = true; createMode = 'snapshot'; }}
+              class="mt-2 px-3 py-1.5 rounded-md text-[11px] font-medium bg-[var(--accent-dim)] text-[var(--surface-0)] hover:bg-[var(--accent)] transition-all duration-150"
+            >+ New Profile</button>
+          </div>
+        {/if}
 
         {#each profiles as profile}
           <button
