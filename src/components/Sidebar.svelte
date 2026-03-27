@@ -6,7 +6,7 @@
   import { getTheme, setTheme, type Theme } from '../lib/theme.svelte';
   import { addToast } from '../lib/toast.svelte';
   import { t } from '../lib/i18n.svelte';
-  import { getActiveAdapter, CLI_ADAPTERS } from '../lib/adapters/index';
+  import { getActiveAdapter, CLI_ADAPTERS, detectInstalledClis } from '../lib/adapters/index';
   import { claudeDir, listDirFull } from '../lib/fs';
   import { loadAppConfig, saveAppConfig } from '../lib/app-config';
   import type { CliAdapter, CliId } from '../lib/adapters/types';
@@ -23,6 +23,7 @@
 
   let appVersion = $state('');
   let activeCliAdapter = $state<CliAdapter | null>(null);
+  let installedClis = $state<CliAdapter[]>(CLI_ADAPTERS);
   let cliPickerOpen = $state(false);
   /** Predefined dirs that physically exist. null = not loaded yet. */
   let existingDirs = $state<Set<string> | null>(null);
@@ -40,6 +41,7 @@
     activeProfile = getActiveProfile(a.id);
     loadDirConfig(a.id);
   });
+  detectInstalledClis().then(clis => { installedClis = clis; });
 
   async function loadDirConfig(cliId: string): Promise<void> {
     // Load user resource dir preferences from app config
@@ -559,8 +561,8 @@
     {/each}
   </nav>
 
-  <!-- CLI Switcher -->
-  {#if activeCliAdapter}
+  <!-- CLI Switcher (hidden when only one CLI is installed) -->
+  {#if activeCliAdapter && installedClis.length > 1}
     <div class="px-2.5 py-2 border-t border-[var(--border-default)] relative">
       <button
         onclick={() => cliPickerOpen = !cliPickerOpen}
@@ -580,7 +582,7 @@
 
       {#if cliPickerOpen}
         <div class="absolute bottom-full left-2.5 right-2.5 mb-1 rounded border border-[var(--border-default)] bg-[var(--surface-0)] shadow-lg shadow-black/10 z-50 overflow-hidden animate-fade-in">
-          {#each CLI_ADAPTERS as adapter}
+          {#each installedClis as adapter}
             <button
               onclick={() => switchCliFromSidebar(adapter.id)}
               class="w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors duration-100
@@ -603,6 +605,16 @@
           {/each}
         </div>
       {/if}
+    </div>
+  {:else if activeCliAdapter}
+    <!-- Single CLI: just show the badge without dropdown -->
+    <div class="px-2.5 py-2 border-t border-[var(--border-default)]">
+      <div class="flex items-center gap-2 px-2.5 py-1.5">
+        <span class="w-2 h-2 rounded-full shrink-0
+          {activeCliAdapter.id === 'claude' ? 'bg-orange-400' : activeCliAdapter.id === 'codex' ? 'bg-green-400' : 'bg-blue-400'}"></span>
+        <span class="text-[12px] font-medium text-[var(--text-secondary)] truncate">{activeCliAdapter.label}</span>
+        <span class="text-[10px] text-[var(--text-ghost)] font-mono shrink-0">{activeCliAdapter.configDirName}</span>
+      </div>
     </div>
   {/if}
 

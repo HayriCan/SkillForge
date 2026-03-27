@@ -3,6 +3,8 @@ import { ClaudeAdapter } from './claude';
 import { CodexAdapter } from './codex';
 import { GeminiAdapter } from './gemini';
 import { loadAppConfig, saveAppConfig } from '../app-config';
+import { homeDir } from '@tauri-apps/api/path';
+import { exists } from '@tauri-apps/plugin-fs';
 
 export type { CliAdapter, CliId };
 
@@ -26,4 +28,28 @@ export async function setActiveAdapter(id: CliId): Promise<CliAdapter> {
   config.activeCli = id;
   await saveAppConfig(config);
   return getAdapter(id);
+}
+
+/**
+ * Detect which CLI config directories exist on disk.
+ * Returns only adapters whose configDirName exists under $HOME.
+ * Claude is always included as it's the primary adapter.
+ */
+export async function detectInstalledClis(): Promise<CliAdapter[]> {
+  const home = await homeDir();
+  const base = home.endsWith('/') || home.endsWith('\\') ? home.slice(0, -1) : home;
+  const results: CliAdapter[] = [];
+  for (const adapter of CLI_ADAPTERS) {
+    if (adapter.id === 'claude') {
+      results.push(adapter);
+      continue;
+    }
+    try {
+      const dirExists = await exists(`${base}/${adapter.configDirName}`);
+      if (dirExists) results.push(adapter);
+    } catch {
+      // Skip if check fails
+    }
+  }
+  return results;
 }

@@ -2,6 +2,7 @@
   import { onMount, tick } from 'svelte';
   import { open } from '@tauri-apps/plugin-dialog';
   import { exportBackup, importBackup, listExportCategories, createFullBackup, type ExportCategory } from '../lib/backup';
+  import { autoSaveDefault } from '../lib/profiles';
   import { addToast } from '../lib/toast.svelte';
 
   let { initialSection = '' } = $props<{ initialSection?: string }>();
@@ -133,6 +134,8 @@
         progress = current;
         progressTotal = total;
       });
+      // Update __default__ snapshot so profile switching reflects the imported data
+      await autoSaveDefault(true);
       importResult = result;
       addToast(`Restored ${result.restored} files${result.skipped > 0 ? `, ${result.skipped} skipped` : ''}. Reloading…`, 'success');
       setTimeout(() => location.reload(), 1200);
