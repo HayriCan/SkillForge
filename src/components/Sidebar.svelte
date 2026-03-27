@@ -114,10 +114,12 @@
   onMount(() => {
     if (menuPortal) document.body.appendChild(menuPortal);
 
+    // Ensure token estimate runs on mount regardless of $effect timing
+    refreshProfiles();
+
     const onCliChange = async (e: Event) => {
       const id = (e as CustomEvent<{ id: string }>).detail.id;
       activeCliAdapter = await getActiveAdapter();
-      // Restore the per-CLI profile for the newly activated CLI
       activeProfile = getActiveProfile(id);
       await refreshProfiles();
     };
@@ -140,11 +142,16 @@
   }
 
   async function refreshProfiles(): Promise<void> {
-    profiles = await listProfiles();
+    try {
+      profiles = await listProfiles();
+    } catch { profiles = []; }
     if (activeCliAdapter) {
       activeProfile = getActiveProfile(activeCliAdapter.id);
     }
-    estimateCurrentTokens().then((est) => { currentTokens = est.total; }).catch(() => {});
+    try {
+      const est = await estimateCurrentTokens();
+      currentTokens = est.total;
+    } catch { /* token estimate unavailable */ }
   }
 
   async function activateMinimalMode(): Promise<void> {

@@ -10,8 +10,8 @@
   import MarketplacesSection from '../components/settings/MarketplacesSection.svelte';
   import UnknownSection from '../components/settings/UnknownSection.svelte';
   import { t } from '../lib/i18n.svelte';
-  import { CLI_ADAPTERS, getActiveAdapter, setActiveAdapter } from '../lib/adapters/index';
-  import type { CliAdapter, CliId } from '../lib/adapters/types';
+  import { CLI_ADAPTERS, getActiveAdapter } from '../lib/adapters/index';
+  import type { CliAdapter } from '../lib/adapters/types';
   import MarkdownEditor from '../components/MarkdownEditor.svelte';
   import { addToast } from '../lib/toast.svelte';
   type FileTab = { label: string; path: string };
@@ -106,11 +106,6 @@
     } finally {
       instrSaving = false;
     }
-  }
-
-  async function switchCli(id: CliId) {
-    activeAdapter = await setActiveAdapter(id);
-    await load();
   }
 
   async function saveRawFile() {
@@ -227,32 +222,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="h-full min-h-0 flex flex-col max-w-4xl mx-auto w-full overflow-y-auto">
-  <!-- Active CLI Selector -->
-  <div class="mb-5">
-    <div class="flex items-center gap-2.5 mb-2">
-      <span class="text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-[0.15em]">Active CLI</span>
-    </div>
-    <div class="flex gap-2 flex-wrap">
-      {#each CLI_ADAPTERS as adapter}
-        {@const isActive = activeAdapter.id === adapter.id}
-        <button
-          onclick={() => switchCli(adapter.id)}
-          class="flex items-center gap-2 px-3 py-2 rounded-lg border text-[12px] font-medium transition-all
-                 {isActive
-                   ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
-                   : 'border-[var(--border-subtle)] text-[var(--text-muted)] hover:border-[var(--border-default)] hover:text-[var(--text-secondary)]'}"
-        >
-          <span class="w-1.5 h-1.5 rounded-full
-            {adapter.id === 'claude' ? 'bg-orange-400' : adapter.id === 'codex' ? 'bg-green-400' : 'bg-blue-400'}"></span>
-          {adapter.label}
-          {#if isActive}
-            <span class="text-[9px] opacity-60">active</span>
-          {/if}
-        </button>
-      {/each}
-    </div>
-    <p class="text-[11px] text-[var(--text-ghost)] mt-1.5">{activeAdapter.description} &middot; Instructions: <span class="font-mono">{activeAdapter.instructionsFileName}</span></p>
-  </div>
+  <!-- CLI info (switching happens in sidebar) -->
 
   <!-- Config Directory -->
   <div class="mb-5">
