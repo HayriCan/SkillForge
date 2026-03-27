@@ -11,7 +11,13 @@ export type BackupBundle = {
   version: '1';
   createdAt: string;
   claudeDir: string;
+  homeDir?: string;
   files: BackupFile[];
+};
+
+export type ExportFileInfo = {
+  name: string;
+  relativePath: string;
 };
 
 export type ExportCategory = {
@@ -19,6 +25,7 @@ export type ExportCategory = {
   label: string;
   description: string;
   fileCount: number;
+  files: ExportFileInfo[];
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -108,46 +115,57 @@ export async function listExportCategories(): Promise<ExportCategory[]> {
   const categories: ExportCategory[] = [];
   const seen = new Set<string>();
 
-  // Always-present capability dirs (with live file count)
+  // Collect all files once
+  const allFiles: BackupFile[] = [];
+  await collectFiles(base, base, allFiles);
+
+  // Group files by top-level directory
+  const filesByCategory = new Map<string, ExportFileInfo[]>();
+
+  for (const f of allFiles) {
+    const sep = f.relativePath.indexOf('/');
+    const segment = sep === -1 ? '__root__' : f.relativePath.slice(0, sep);
+    // Show path relative to category dir (e.g. "my-skill/SKILL.md" instead of just "SKILL.md")
+    const nameInCategory = sep === -1 ? f.relativePath : f.relativePath.slice(sep + 1);
+    if (!filesByCategory.has(segment)) filesByCategory.set(segment, []);
+    filesByCategory.get(segment)!.push({ name: nameInCategory, relativePath: f.relativePath });
+  }
+
+  // Always-present capability dirs (even if empty)
   for (const id of KNOWN_CAPABILITY_DIRS) {
-    const count = await countFiles(`${base}/${id}`, true);
+    const files = filesByCategory.get(id) ?? [];
     categories.push({
       id,
       label: CATEGORY_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1),
       description: CATEGORY_DESCRIPTIONS[id] ?? '',
-      fileCount: count,
+      fileCount: files.length,
+      files,
     });
     seen.add(id);
   }
 
   // Root-level config files
-  const allFiles: BackupFile[] = [];
-  await collectFiles(base, base, allFiles);
-  const rootCount = allFiles.filter(f => !f.relativePath.includes('/')).length;
-  if (rootCount > 0) {
+  const rootFiles = filesByCategory.get('__root__') ?? [];
+  if (rootFiles.length > 0) {
     categories.push({
       id: '__root__',
       label: CATEGORY_LABELS['__root__'],
       description: CATEGORY_DESCRIPTIONS['__root__'],
-      fileCount: rootCount,
+      fileCount: rootFiles.length,
+      files: rootFiles,
     });
     seen.add('__root__');
   }
 
   // Dynamically discovered dirs not in the known list
-  const counts: Record<string, number> = {};
-  for (const f of allFiles) {
-    const sep = f.relativePath.indexOf('/');
-    if (sep === -1) continue; // root-level, already handled
-    const segment = f.relativePath.slice(0, sep);
-    if (!seen.has(segment)) counts[segment] = (counts[segment] ?? 0) + 1;
-  }
-  for (const [id, count] of Object.entries(counts)) {
+  for (const [id, files] of filesByCategory) {
+    if (seen.has(id)) continue;
     categories.push({
       id,
       label: CATEGORY_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1),
       description: CATEGORY_DESCRIPTIONS[id] ?? '',
-      fileCount: count,
+      fileCount: files.length,
+      files,
     });
   }
 
@@ -159,6 +177,7 @@ export async function listExportCategories(): Promise<ExportCategory[]> {
       label: CATEGORY_LABELS['__home__'],
       description: CATEGORY_DESCRIPTIONS['__home__'],
       fileCount: 1,
+      files: [{ name: '.claude.json', relativePath: '__home__/.claude.json' }],
     });
   } catch { /* not present */ }
 
@@ -194,43 +213,57 @@ async function collectFiles(dir: string, base: string, files: BackupFile[]): Pro
 /**
  * Export .claude directory as a JSON bundle.
  * selectedCategories: category IDs to include (e.g. 'agents', '__root__', '__home__').
- * If omitted, exports everything.
+ * selectedFiles: specific relative paths to include (for individual file export).
+ * If both are omitted, exports everything.
  * Returns the path of the exported file.
  */
-export async function exportBackup(selectedCategories?: string[]): Promise<string> {
+export async function exportBackup(
+  selectedCategories?: string[],
+  selectedFiles?: string[],
+): Promise<string> {
   const base = await claudeDir();
   const home = await homeDir();
   const homePath = home.endsWith('/') ? home.slice(0, -1) : home;
 
   const files: BackupFile[] = [];
-  const all = !selectedCategories || selectedCategories.length === 0;
   const catSet = new Set(selectedCategories ?? []);
+  const fileSet = new Set(selectedFiles ?? []);
+  const all = catSet.size === 0 && fileSet.size === 0;
 
-  if (all || catSet.size > 0) {
-    const allFiles: BackupFile[] = [];
-    await collectFiles(base, base, allFiles);
+  const allFiles: BackupFile[] = [];
+  await collectFiles(base, base, allFiles);
 
-    for (const f of allFiles) {
-      const sep = f.relativePath.indexOf('/');
-      const segment = sep === -1 ? '__root__' : f.relativePath.slice(0, sep);
-      if (all || catSet.has(segment)) {
-        files.push(f);
-      }
+  for (const f of allFiles) {
+    if (all) {
+      files.push(f);
+      continue;
     }
-
-    // ~/.claude.json
-    if (all || catSet.has('__home__')) {
-      try {
-        const claudeJson = await readFile(`${homePath}/.claude.json`);
-        files.push({ relativePath: '__home__/.claude.json', content: claudeJson });
-      } catch {}
+    // Check individual file selection
+    if (fileSet.has(f.relativePath)) {
+      files.push(f);
+      continue;
     }
+    // Check category selection
+    const sep = f.relativePath.indexOf('/');
+    const segment = sep === -1 ? '__root__' : f.relativePath.slice(0, sep);
+    if (catSet.has(segment)) {
+      files.push(f);
+    }
+  }
+
+  // ~/.claude.json
+  if (all || catSet.has('__home__') || fileSet.has('__home__/.claude.json')) {
+    try {
+      const claudeJson = await readFile(`${homePath}/.claude.json`);
+      files.push({ relativePath: '__home__/.claude.json', content: claudeJson });
+    } catch {}
   }
 
   const bundle: BackupBundle = {
     version: '1',
     createdAt: new Date().toISOString(),
     claudeDir: base,
+    homeDir: homePath,
     files,
   };
 
@@ -261,19 +294,35 @@ export async function importBackup(
   const base = await claudeDir();
   const home = await homeDir();
   const homePath = home.endsWith('/') ? home.slice(0, -1) : home;
+
+  // Build path rewriting rules from bundle metadata → current system paths
+  const rewrites: Array<[string, string]> = [];
+  if (bundle.claudeDir && bundle.claudeDir !== base) {
+    rewrites.push([bundle.claudeDir, base]);
+  }
+  if (bundle.homeDir && bundle.homeDir !== homePath) {
+    rewrites.push([bundle.homeDir, homePath]);
+  }
+
   let restored = 0;
   let skipped = 0;
   const total = bundle.files.length;
 
   for (const file of bundle.files) {
     try {
+      // Rewrite paths in file contents if source and target systems differ
+      let content = file.content;
+      for (const [oldPath, newPath] of rewrites) {
+        content = content.replaceAll(oldPath, newPath);
+      }
+
       // __home__/.claude.json is stored in home dir, not inside ~/.claude/
       const targetPath = file.relativePath.startsWith('__home__/')
         ? `${homePath}/${file.relativePath.slice('__home__/'.length)}`
         : `${base}/${file.relativePath}`;
       const dir = targetPath.substring(0, targetPath.lastIndexOf('/'));
       await ensureDir(dir);
-      await writeFile(targetPath, file.content);
+      await writeFile(targetPath, content);
       restored++;
     } catch {
       skipped++;

@@ -14,6 +14,8 @@ Visually manage your CLI configuration — agents, skills, MCP servers, profiles
 [![Built with Tauri](https://img.shields.io/badge/Tauri-2-FFC131?logo=tauri&logoColor=white)](https://tauri.app)
 [![Built with Svelte](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte&logoColor=white)](https://svelte.dev)
 
+**English** | **[Türkçe](README_TR.md)** | **[简体中文](README_ZH.md)** | **[Deutsch](README_DE.md)** | **[Français](README_FR.md)** | **[日本語](README_JA.md)** | **[한국어](README_KO.md)** | **[Polski](README_PL.md)** | **[繁體中文](README_ZH_TW.md)**
+
 </div>
 
 ---
@@ -31,7 +33,7 @@ Claude Code stores everything in `~/.claude/`, Codex CLI in `~/.codex/`, and Gem
 - Search across all your agents, skills, and commands with `Ctrl+K`
 - Manage MCP servers without touching `.mcp.json`
 - Edit global instructions (CLAUDE.md, AGENTS.md) directly from Settings with Rich/Raw toggle
-- Back up and restore your config as a portable `.sfbackup` bundle
+- Back up, share, and restore your config as a portable `.sfbackup` bundle — with individual file selection and automatic path rewriting across machines
 - Switch the core UI language without editing config files (9 languages)
 - Catch validation errors before they silently break your workflows
 
@@ -50,7 +52,7 @@ Claude Code stores everything in `~/.claude/`, Codex CLI in `~/.codex/`, and Gem
 | **Profiles** | Config snapshots | Save and restore per-CLI configurations per project or client |
 | **Settings** | Structured + raw JSON | Guided settings sections, direct JSON editing, and inline global instructions editor (CLAUDE.md / AGENTS.md) with Rich/Raw toggle |
 | **Command Palette** | `Ctrl+K` | Fuzzy-search across all resource types instantly |
-| **Backup & Restore** | Portable bundles | Export selected capability groups to `.sfbackup`, then restore in merge or overwrite mode |
+| **Backup & Restore** | Portable bundles | Full backup (tar.gz), selective Share & Export with individual file picking, and import with automatic path rewriting for cross-machine portability |
 | **History & Diff** | Change review | See what changed before you overwrite anything |
 | **Preferences** | App-level controls | Change theme, language, and custom config directory from one modal |
 | **Language Support** | 9 UI languages | English, Deutsch, Français, Japanese, Korean, Polish, Turkish, Simplified Chinese, Traditional Chinese |
@@ -101,7 +103,7 @@ You can change the language from `Preferences` inside the app. The localization 
 | Switch configs | Manual copy/paste | One-click profile switch |
 | MCP server setup | Edit `.mcp.json` by hand | GUI with form validation |
 | Find a file | `ls ~/.claude/agents/` | `Ctrl+K` fuzzy search |
-| Backup config | `cp -r ~/.claude ~/backup` | Selective export to `.sfbackup` |
+| Backup config | `cp -r ~/.claude ~/backup` | Full backup or selective Share & Export with per-file granularity |
 | Catch typos | After the fact | Inline, as you type |
 
 ---

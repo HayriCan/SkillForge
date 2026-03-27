@@ -25,8 +25,11 @@
   let lastExportPath = $state('');
   let categories = $state<ExportCategory[]>([]);
   let selectedIds = $state<Set<string>>(new Set());
-  let categoriesLoading = $state(true);
+  let selectedFiles = $state<Set<string>>(new Set());
+  let categoriesLoading = $state(false);
+  let scanned = $state(false);
   let showAdditional = $state(false);
+  let expandedCategories = $state<Set<string>>(new Set());
 
   // Full backup state
   let fullBackupRunning = $state(false);
@@ -41,29 +44,69 @@
   let progressTotal = $state(0);
 
   let progressPct = $derived(progressTotal > 0 ? Math.round((progress / progressTotal) * 100) : 0);
-  let selectedFileCount = $derived(
-    categories.filter(c => selectedIds.has(c.id)).reduce((sum, c) => sum + c.fileCount, 0)
-  );
+
+  let selectedFileCount = $derived.by(() => {
+    let count = 0;
+    for (const cat of categories) {
+      if (selectedIds.has(cat.id)) {
+        count += cat.fileCount;
+      } else {
+        for (const f of cat.files) {
+          if (selectedFiles.has(f.relativePath)) count++;
+        }
+      }
+    }
+    return count;
+  });
+
   let capabilityCategories = $derived(categories.filter(c => CAPABILITY_IDS.has(c.id)));
   let additionalCategories = $derived(categories.filter(c => !CAPABILITY_IDS.has(c.id)));
   let allCapabilitiesSelected = $derived(capabilityCategories.every(c => selectedIds.has(c.id)));
 
-  // Load categories on mount — default: only capabilities selected
-  $effect(() => {
-    listExportCategories().then(cats => {
+  async function scanContents() {
+    categoriesLoading = true;
+    try {
+      const cats = await listExportCategories();
       categories = cats;
       selectedIds = new Set(cats.filter(c => CAPABILITY_IDS.has(c.id)).map(c => c.id));
+      selectedFiles = new Set();
+      scanned = true;
+    } catch {
+      addToast('Failed to scan .claude directory', 'error');
+    } finally {
       categoriesLoading = false;
-    }).catch(() => {
-      categoriesLoading = false;
-    });
-  });
+    }
+  }
 
   function toggleCategory(id: string) {
     const next = new Set(selectedIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+      // Remove individual file selections for this category (category covers all)
+      const cat = categories.find(c => c.id === id);
+      if (cat) {
+        const nextFiles = new Set(selectedFiles);
+        for (const f of cat.files) nextFiles.delete(f.relativePath);
+        selectedFiles = nextFiles;
+      }
+    }
+    selectedIds = next;
+  }
+
+  function toggleFile(relativePath: string) {
+    const next = new Set(selectedFiles);
+    if (next.has(relativePath)) next.delete(relativePath);
+    else next.add(relativePath);
+    selectedFiles = next;
+  }
+
+  function toggleExpandCategory(id: string) {
+    const next = new Set(expandedCategories);
     if (next.has(id)) next.delete(id);
     else next.add(id);
-    selectedIds = next;
+    expandedCategories = next;
   }
 
   function toggleAllCapabilities() {
@@ -81,6 +124,11 @@
     selectedIds = next;
   }
 
+  function isCategoryPartiallySelected(cat: ExportCategory): boolean {
+    if (selectedIds.has(cat.id)) return false;
+    return cat.files.some(f => selectedFiles.has(f.relativePath));
+  }
+
   async function pickFile() {
     const selected = await open({
       multiple: false,
@@ -90,10 +138,15 @@
   }
 
   async function doExport() {
-    if (selectedIds.size === 0) return;
+    const catIds = [...selectedIds];
+    const fileIds = [...selectedFiles];
+    if (catIds.length === 0 && fileIds.length === 0) return;
     exporting = true;
     try {
-      const path = await exportBackup([...selectedIds]);
+      const path = await exportBackup(
+        catIds.length > 0 ? catIds : undefined,
+        fileIds.length > 0 ? fileIds : undefined,
+      );
       lastExportPath = path;
       addToast(`Backup exported to ${path}`, 'success');
     } catch (e) {
@@ -162,6 +215,68 @@
   };
 </script>
 
+{#snippet categoryRow(cat: ExportCategory, indent: boolean)}
+  {@const checked = selectedIds.has(cat.id)}
+  {@const partial = isCategoryPartiallySelected(cat)}
+  {@const expanded = expandedCategories.has(cat.id)}
+  <div>
+    <div class="flex items-center gap-1 {indent ? 'px-3' : '-mx-5 px-5'}">
+      <!-- Expand toggle -->
+      {#if cat.files.length > 0}
+        <button
+          onclick={() => toggleExpandCategory(cat.id)}
+          class="w-4 h-4 flex items-center justify-center text-[9px] text-[var(--text-ghost)] hover:text-[var(--text-muted)] transition-colors flex-shrink-0"
+        >
+          <span class="transition-transform duration-150 {expanded ? 'rotate-90' : ''}">▶</span>
+        </button>
+      {:else}
+        <div class="w-4"></div>
+      {/if}
+
+      <button
+        onclick={() => toggleCategory(cat.id)}
+        class="flex items-center gap-2.5 py-[7px] text-left group transition-colors duration-100 hover:bg-[var(--surface-3)] flex-1 min-w-0 rounded px-1"
+      >
+        <div class="w-3.5 h-3.5 rounded flex-shrink-0 border transition-all duration-150 flex items-center justify-center
+                    {checked ? 'bg-[var(--accent-dim)] border-[var(--accent-dim)]' : partial ? 'border-[var(--accent-dim)] bg-[var(--accent)]/20' : 'border-[var(--border-default)] bg-[var(--surface-1)] group-hover:border-[var(--accent-dim)]'}">
+          {#if checked}<span class="text-[var(--surface-0)] text-[8px] font-bold leading-none">✓</span>
+          {:else if partial}<span class="text-[var(--accent-dim)] text-[8px] font-bold leading-none">–</span>{/if}
+        </div>
+        <span class="text-[12px] w-4 text-center leading-none flex-shrink-0 {checked || partial ? 'text-[var(--accent-dim)]' : 'text-[var(--text-ghost)]'}">
+          {CATEGORY_ICONS[cat.id] ?? '·'}
+        </span>
+        <span class="flex-1 min-w-0 text-[12px] font-medium truncate {checked || partial ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'} transition-colors">
+          {cat.label}
+        </span>
+        <span class="flex-shrink-0 text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded {checked || partial ? 'bg-[var(--accent)]/10 text-[var(--accent-dim)]' : 'bg-[var(--surface-3)] text-[var(--text-ghost)]'}">
+          {cat.fileCount}
+        </span>
+      </button>
+    </div>
+
+    <!-- Expanded file list -->
+    {#if expanded && cat.files.length > 0}
+      <div class="ml-6 {indent ? 'ml-8' : 'ml-5'} border-l border-[var(--border-subtle)] pl-3 py-1">
+        {#each cat.files as file}
+          {@const fileChecked = checked || selectedFiles.has(file.relativePath)}
+          <button
+            onclick={() => { if (!checked) toggleFile(file.relativePath); }}
+            disabled={checked}
+            class="flex items-center gap-2 py-[5px] px-2 w-full text-left rounded transition-colors duration-100
+                   {checked ? 'opacity-60 cursor-default' : 'hover:bg-[var(--surface-3)] cursor-pointer'}"
+          >
+            <div class="w-3 h-3 rounded-sm flex-shrink-0 border transition-all duration-150 flex items-center justify-center
+                        {fileChecked ? 'bg-[var(--accent-dim)] border-[var(--accent-dim)]' : 'border-[var(--border-default)] bg-[var(--surface-1)]'}">
+              {#if fileChecked}<span class="text-[var(--surface-0)] text-[7px] font-bold leading-none">✓</span>{/if}
+            </div>
+            <span class="text-[11px] font-mono text-[var(--text-muted)] truncate">{file.name}</span>
+          </button>
+        {/each}
+      </div>
+    {/if}
+  </div>
+{/snippet}
+
 <div class="h-full overflow-y-auto px-8 py-6 max-w-2xl mx-auto w-full">
   <!-- Header -->
   <div class="mb-5">
@@ -214,37 +329,69 @@
     {/if}
   </div>
 
-  <!-- Export section -->
+  <!-- Share & Export section -->
   <div bind:this={exportSectionEl} class="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-2)] mb-3 overflow-hidden">
-    <!-- Export header -->
+    <!-- Header -->
     <div class="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[var(--border-subtle)]">
       <div class="flex items-center gap-2.5">
         <div class="w-6 h-6 rounded-md bg-[var(--accent)]/15 flex items-center justify-center">
           <span class="text-[var(--accent)] text-[11px] font-bold leading-none">↑</span>
         </div>
-        <h3 class="text-[13px] font-semibold text-[var(--text-primary)]">Export Backup</h3>
+        <div>
+          <h3 class="text-[13px] font-semibold text-[var(--text-primary)]">Share & Export</h3>
+          <p class="text-[10px] text-[var(--text-ghost)] mt-0.5">
+            Select capabilities or individual files to export as a portable <code class="font-mono text-[var(--accent-dim)]">.sfbackup</code> bundle
+          </p>
+        </div>
       </div>
       <div class="flex items-center gap-3">
-        {#if !categoriesLoading && categories.length > 0}
+        {#if scanned && categories.length > 0}
           <span class="text-[11px] text-[var(--text-ghost)]">
-            {selectedFileCount} file{selectedFileCount !== 1 ? 's' : ''} selected
+            {selectedFileCount} file{selectedFileCount !== 1 ? 's' : ''}
           </span>
         {/if}
-        <button
-          onclick={doExport}
-          disabled={exporting || selectedIds.size === 0}
-          class="px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-200
-                 bg-[var(--accent-dim)] hover:bg-[var(--accent)] text-[var(--surface-0)]
-                 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-black/5"
-        >
-          {exporting ? 'Exporting…' : 'Export'}
-        </button>
+        {#if !scanned}
+          <button
+            onclick={scanContents}
+            disabled={categoriesLoading}
+            class="px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-200 flex items-center gap-1.5
+                   bg-[var(--accent-dim)] hover:bg-[var(--accent)] text-[var(--surface-0)]
+                   disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-black/5"
+          >
+            {#if categoriesLoading}
+              <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              Scanning…
+            {:else}
+              Scan Contents
+            {/if}
+          </button>
+        {:else}
+          <button
+            onclick={doExport}
+            disabled={exporting || (selectedIds.size === 0 && selectedFiles.size === 0)}
+            class="px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-200
+                   bg-[var(--accent-dim)] hover:bg-[var(--accent)] text-[var(--surface-0)]
+                   disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-black/5"
+          >
+            {exporting ? 'Exporting…' : 'Export'}
+          </button>
+        {/if}
       </div>
     </div>
 
     <!-- Category list -->
     <div class="px-5 py-3">
-      {#if categoriesLoading}
+      {#if !scanned && !categoriesLoading}
+        <div class="flex flex-col items-center gap-2 py-6 text-center">
+          <span class="text-[24px] opacity-30">📦</span>
+          <p class="text-[11px] text-[var(--text-ghost)]">
+            Click <strong class="text-[var(--text-muted)]">Scan Contents</strong> to discover exportable capabilities and files
+          </p>
+        </div>
+      {:else if categoriesLoading}
         <div class="flex items-center gap-2 py-3">
           <span class="text-[11px] text-[var(--text-ghost)] animate-pulse">Scanning .claude directory…</span>
         </div>
@@ -254,35 +401,32 @@
         <!-- Transferable Capabilities -->
         <div class="flex items-center justify-between mb-1">
           <span class="text-[10px] font-medium text-[var(--text-ghost)] uppercase tracking-wider">Capabilities</span>
-          <button
-            onclick={toggleAllCapabilities}
-            class="text-[10px] text-[var(--accent-dim)] hover:text-[var(--accent)] transition-colors duration-150"
-          >
-            {allCapabilitiesSelected ? 'Deselect all' : 'Select all'}
-          </button>
+          <div class="flex items-center gap-3">
+            <button
+              onclick={scanContents}
+              disabled={categoriesLoading}
+              class="text-[10px] text-[var(--text-ghost)] hover:text-[var(--accent-dim)] transition-colors duration-150 flex items-center gap-1"
+            >
+              {#if categoriesLoading}
+                <svg class="w-2.5 h-2.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+              {/if}
+              Rescan
+            </button>
+            <button
+              onclick={toggleAllCapabilities}
+              class="text-[10px] text-[var(--accent-dim)] hover:text-[var(--accent)] transition-colors duration-150"
+            >
+              {allCapabilitiesSelected ? 'Deselect all' : 'Select all'}
+            </button>
+          </div>
         </div>
 
-        <div class="flex flex-col divide-y divide-[var(--border-subtle)] max-h-[240px] overflow-y-auto mb-2">
+        <div class="flex flex-col divide-y divide-[var(--border-subtle)] max-h-[320px] overflow-y-auto mb-2">
           {#each capabilityCategories as cat}
-            {@const checked = selectedIds.has(cat.id)}
-            <button
-              onclick={() => toggleCategory(cat.id)}
-              class="flex items-center gap-2.5 py-[7px] text-left group transition-colors duration-100 hover:bg-[var(--surface-3)] -mx-5 px-5"
-            >
-              <div class="w-3.5 h-3.5 rounded flex-shrink-0 border transition-all duration-150 flex items-center justify-center
-                          {checked ? 'bg-[var(--accent-dim)] border-[var(--accent-dim)]' : 'border-[var(--border-default)] bg-[var(--surface-1)] group-hover:border-[var(--accent-dim)]'}">
-                {#if checked}<span class="text-[var(--surface-0)] text-[8px] font-bold leading-none">✓</span>{/if}
-              </div>
-              <span class="text-[12px] w-4 text-center leading-none flex-shrink-0 {checked ? 'text-[var(--accent-dim)]' : 'text-[var(--text-ghost)]'}">
-                {CATEGORY_ICONS[cat.id] ?? '·'}
-              </span>
-              <span class="flex-1 min-w-0 text-[12px] font-medium truncate {checked ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'} transition-colors">
-                {cat.label}
-              </span>
-              <span class="flex-shrink-0 text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded {checked ? 'bg-[var(--accent)]/10 text-[var(--accent-dim)]' : 'bg-[var(--surface-3)] text-[var(--text-ghost)]'}">
-                {cat.fileCount}
-              </span>
-            </button>
+            {@render categoryRow(cat, false)}
           {/each}
         </div>
 
@@ -304,25 +448,7 @@
           {#if showAdditional}
             <div class="flex flex-col divide-y divide-[var(--border-subtle)] border border-[var(--border-subtle)] rounded-lg overflow-hidden mb-1">
               {#each additionalCategories as cat}
-                {@const checked = selectedIds.has(cat.id)}
-                <button
-                  onclick={() => toggleCategory(cat.id)}
-                  class="flex items-center gap-2.5 py-[7px] px-3 text-left group transition-colors duration-100 hover:bg-[var(--surface-3)]"
-                >
-                  <div class="w-3.5 h-3.5 rounded flex-shrink-0 border transition-all duration-150 flex items-center justify-center
-                              {checked ? 'bg-[var(--accent-dim)] border-[var(--accent-dim)]' : 'border-[var(--border-default)] bg-[var(--surface-1)] group-hover:border-[var(--accent-dim)]'}">
-                    {#if checked}<span class="text-[var(--surface-0)] text-[8px] font-bold leading-none">✓</span>{/if}
-                  </div>
-                  <span class="text-[12px] w-4 text-center leading-none flex-shrink-0 {checked ? 'text-[var(--accent-dim)]' : 'text-[var(--text-ghost)]'}">
-                    {CATEGORY_ICONS[cat.id] ?? '·'}
-                  </span>
-                  <span class="flex-1 min-w-0 text-[12px] font-medium truncate {checked ? 'text-[var(--text-secondary)]' : 'text-[var(--text-ghost)]'} transition-colors">
-                    {cat.label}
-                  </span>
-                  <span class="flex-shrink-0 text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded {checked ? 'bg-[var(--accent)]/10 text-[var(--accent-dim)]' : 'bg-[var(--surface-3)] text-[var(--text-ghost)]'}">
-                    {cat.fileCount}
-                  </span>
-                </button>
+                {@render categoryRow(cat, true)}
               {/each}
             </div>
             <div class="flex justify-end">
@@ -405,6 +531,12 @@
           {importing ? 'Restoring…' : 'Restore'}
         </button>
       </div>
+
+      <!-- Path rewriting info -->
+      <p class="text-[10px] text-[var(--text-ghost)] flex items-center gap-1">
+        <span class="text-[var(--accent-dim)]">↻</span>
+        Paths are automatically adjusted when restoring on a different machine
+      </p>
 
       <!-- Progress bar -->
       {#if importing && progressTotal > 0}
