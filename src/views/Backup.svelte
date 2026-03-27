@@ -7,17 +7,18 @@
   import { getActiveAdapter } from '../lib/adapters/index';
 
   let configDirName = $state('');
-
-  onMount(async () => {
-    const adapter = await getActiveAdapter();
-    configDirName = adapter.configDirName;
-  });
+  let lastCliId = $state('');
 
   let { initialSection = '' } = $props<{ initialSection?: string }>();
   let exportSectionEl = $state<HTMLElement | null>(null);
   let importSectionEl = $state<HTMLElement | null>(null);
 
   onMount(async () => {
+    // Load current CLI info on mount
+    const adapter = await getActiveAdapter();
+    configDirName = adapter.configDirName;
+    lastCliId = adapter.id;
+
     if (initialSection) {
       await tick();
       const target = initialSection === 'import' ? importSectionEl : exportSectionEl;
@@ -33,7 +34,7 @@
   let lastExportPath = $state('');
   let categories = $state<ExportCategory[]>([]);
   let selectedIds = $state<Set<string>>(new Set());
-  let selectedFiles = $state<Set<string>>(new Set());
+  let selectedItems = $state<Set<string>>(new Set());
   let categoriesLoading = $state(false);
   let scanned = $state(false);
   let showAdditional = $state(false);
@@ -53,14 +54,44 @@
 
   let progressPct = $derived(progressTotal > 0 ? Math.round((progress / progressTotal) * 100) : 0);
 
+  /** Get unique top-level items within a category (skill names, agent names, etc.) */
+  function getItems(cat: ExportCategory): { name: string; fileCount: number }[] {
+    const map = new Map<string, number>();
+    for (const f of cat.files) {
+      const sep = f.name.indexOf('/');
+      const item = sep === -1 ? f.name : f.name.slice(0, sep);
+      map.set(item, (map.get(item) ?? 0) + 1);
+    }
+    return [...map.entries()].map(([name, fileCount]) => ({ name, fileCount }));
+  }
+
+  /** Get the item key for selection (e.g. "skills/pptx") */
+  function itemKey(catId: string, itemName: string): string {
+    return `${catId}/${itemName}`;
+  }
+
+  /** Get all file relativePaths for a given item within a category */
+  function filesForItem(cat: ExportCategory, itemName: string): string[] {
+    return cat.files
+      .filter(f => {
+        const sep = f.name.indexOf('/');
+        const item = sep === -1 ? f.name : f.name.slice(0, sep);
+        return item === itemName;
+      })
+      .map(f => f.relativePath);
+  }
+
   let selectedFileCount = $derived.by(() => {
     let count = 0;
     for (const cat of categories) {
       if (selectedIds.has(cat.id)) {
         count += cat.fileCount;
       } else {
-        for (const f of cat.files) {
-          if (selectedFiles.has(f.relativePath)) count++;
+        // Count files from individually selected items
+        for (const item of getItems(cat)) {
+          if (selectedItems.has(itemKey(cat.id, item.name))) {
+            count += item.fileCount;
+          }
         }
       }
     }
@@ -72,12 +103,27 @@
   let allCapabilitiesSelected = $derived(capabilityCategories.every(c => selectedIds.has(c.id)));
 
   async function scanContents() {
+    // Refresh adapter info — CLI may have changed since last scan
+    const adapter = await getActiveAdapter();
+    if (adapter.id !== lastCliId) {
+      // CLI changed — reset state
+      lastCliId = adapter.id;
+      configDirName = adapter.configDirName;
+      categories = [];
+      selectedIds = new Set();
+      selectedItems = new Set();
+      expandedCategories = new Set();
+      lastExportPath = '';
+      fullBackupResult = null;
+    }
+    configDirName = adapter.configDirName;
+
     categoriesLoading = true;
     try {
       const cats = await listExportCategories();
       categories = cats;
       selectedIds = new Set(cats.filter(c => CAPABILITY_IDS.has(c.id)).map(c => c.id));
-      selectedFiles = new Set();
+      selectedItems = new Set();
       scanned = true;
     } catch {
       addToast(`Failed to scan ${configDirName} directory`, 'error');
@@ -92,22 +138,23 @@
       next.delete(id);
     } else {
       next.add(id);
-      // Remove individual file selections for this category (category covers all)
+      // Remove individual item selections for this category (category covers all)
       const cat = categories.find(c => c.id === id);
       if (cat) {
-        const nextFiles = new Set(selectedFiles);
-        for (const f of cat.files) nextFiles.delete(f.relativePath);
-        selectedFiles = nextFiles;
+        const nextItems = new Set(selectedItems);
+        for (const item of getItems(cat)) nextItems.delete(itemKey(id, item.name));
+        selectedItems = nextItems;
       }
     }
     selectedIds = next;
   }
 
-  function toggleFile(relativePath: string) {
-    const next = new Set(selectedFiles);
-    if (next.has(relativePath)) next.delete(relativePath);
-    else next.add(relativePath);
-    selectedFiles = next;
+  function toggleItem(catId: string, itemName: string) {
+    const key = itemKey(catId, itemName);
+    const next = new Set(selectedItems);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    selectedItems = next;
   }
 
   function toggleExpandCategory(id: string) {
@@ -134,7 +181,7 @@
 
   function isCategoryPartiallySelected(cat: ExportCategory): boolean {
     if (selectedIds.has(cat.id)) return false;
-    return cat.files.some(f => selectedFiles.has(f.relativePath));
+    return getItems(cat).some(item => selectedItems.has(itemKey(cat.id, item.name)));
   }
 
   async function pickFile() {
@@ -147,13 +194,23 @@
 
   async function doExport() {
     const catIds = [...selectedIds];
-    const fileIds = [...selectedFiles];
-    if (catIds.length === 0 && fileIds.length === 0) return;
+    // Resolve selected items to their individual file paths
+    const filePaths: string[] = [];
+    for (const key of selectedItems) {
+      const sep = key.indexOf('/');
+      if (sep === -1) continue;
+      const catId = key.slice(0, sep);
+      const itemName = key.slice(sep + 1);
+      if (selectedIds.has(catId)) continue; // category already selected
+      const cat = categories.find(c => c.id === catId);
+      if (cat) filePaths.push(...filesForItem(cat, itemName));
+    }
+    if (catIds.length === 0 && filePaths.length === 0) return;
     exporting = true;
     try {
       const path = await exportBackup(
         catIds.length > 0 ? catIds : undefined,
-        fileIds.length > 0 ? fileIds : undefined,
+        filePaths.length > 0 ? filePaths : undefined,
       );
       lastExportPath = path;
       addToast(`Backup exported to ${path}`, 'success');
@@ -258,28 +315,35 @@
         <span class="flex-1 min-w-0 text-[12px] font-medium truncate {checked || partial ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'} transition-colors">
           {cat.label}
         </span>
-        <span class="flex-shrink-0 text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded {checked || partial ? 'bg-[var(--accent)]/10 text-[var(--accent-dim)]' : 'bg-[var(--surface-3)] text-[var(--text-ghost)]'}">
-          {cat.fileCount}
+        <span
+          class="flex-shrink-0 text-[10px] font-mono tabular-nums px-1.5 py-0.5 rounded {checked || partial ? 'bg-[var(--accent)]/10 text-[var(--accent-dim)]' : 'bg-[var(--surface-3)] text-[var(--text-ghost)]'}"
+          title="{cat.fileCount} file{cat.fileCount !== 1 ? 's' : ''}"
+        >
+          {cat.itemCount}{#if cat.fileCount !== cat.itemCount}<span class="text-[8px] opacity-60">/{cat.fileCount}</span>{/if}
         </span>
       </button>
     </div>
 
-    <!-- Expanded file list -->
+    <!-- Expanded item list (skill names, agent names — not individual files) -->
     {#if expanded && cat.files.length > 0}
       <div class="ml-6 {indent ? 'ml-8' : 'ml-5'} border-l border-[var(--border-subtle)] pl-3 py-1">
-        {#each cat.files as file}
-          {@const fileChecked = checked || selectedFiles.has(file.relativePath)}
+        {#each getItems(cat) as item}
+          {@const key = itemKey(cat.id, item.name)}
+          {@const itemChecked = checked || selectedItems.has(key)}
           <button
-            onclick={() => { if (!checked) toggleFile(file.relativePath); }}
+            onclick={() => { if (!checked) toggleItem(cat.id, item.name); }}
             disabled={checked}
             class="flex items-center gap-2 py-[5px] px-2 w-full text-left rounded transition-colors duration-100
                    {checked ? 'opacity-60 cursor-default' : 'hover:bg-[var(--surface-3)] cursor-pointer'}"
           >
             <div class="w-3 h-3 rounded-sm flex-shrink-0 border transition-all duration-150 flex items-center justify-center
-                        {fileChecked ? 'bg-[var(--accent-dim)] border-[var(--accent-dim)]' : 'border-[var(--border-default)] bg-[var(--surface-1)]'}">
-              {#if fileChecked}<span class="text-[var(--surface-0)] text-[7px] font-bold leading-none">✓</span>{/if}
+                        {itemChecked ? 'bg-[var(--accent-dim)] border-[var(--accent-dim)]' : 'border-[var(--border-default)] bg-[var(--surface-1)]'}">
+              {#if itemChecked}<span class="text-[var(--surface-0)] text-[7px] font-bold leading-none">✓</span>{/if}
             </div>
-            <span class="text-[11px] font-mono text-[var(--text-muted)] truncate">{file.name}</span>
+            <span class="text-[11px] font-mono text-[var(--text-muted)] truncate">{item.name}</span>
+            {#if item.fileCount > 1}
+              <span class="text-[9px] font-mono text-[var(--text-ghost)] shrink-0">{item.fileCount}</span>
+            {/if}
           </button>
         {/each}
       </div>
@@ -380,7 +444,7 @@
         {:else}
           <button
             onclick={doExport}
-            disabled={exporting || (selectedIds.size === 0 && selectedFiles.size === 0)}
+            disabled={exporting || (selectedIds.size === 0 && selectedItems.size === 0)}
             class="px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-200
                    bg-[var(--accent-dim)] hover:bg-[var(--accent)] text-[var(--surface-0)]
                    disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-black/5"

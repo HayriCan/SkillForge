@@ -25,6 +25,8 @@ export type ExportCategory = {
   id: string;
   label: string;
   description: string;
+  /** Number of top-level items (e.g. skill directories, not total files) */
+  itemCount: number;
   fileCount: number;
   files: ExportFileInfo[];
 };
@@ -78,29 +80,11 @@ const SKIP_DIRS = new Set([
   'backups',        // avoid recursive backup inclusion
 ]);
 
+/** Files to skip during scan and export (OS-generated, non-user content) */
+const SKIP_FILES = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
+
 // Well-known capability directories — shown first in the list when they exist on disk.
 const KNOWN_CAPABILITY_DIRS = ['agents', 'commands', 'hooks', 'plugins', 'skills', 'teams'];
-
-/**
- * Count readable text files directly in a directory (non-recursive).
- * Returns 0 if the directory doesn't exist.
- */
-async function countFiles(dir: string, recursive = false): Promise<number> {
-  const files: BackupFile[] = [];
-  try {
-    if (recursive) {
-      await collectFiles(dir, dir, files);
-    } else {
-      const entries = await listDirFull(dir);
-      for (const e of entries) {
-        if (!e.isDir && e.name) {
-          try { await readFile(`${dir}/${e.name}`); files.push({ relativePath: e.name, content: '' }); } catch {}
-        }
-      }
-    }
-  } catch { /* dir doesn't exist */ }
-  return files.length;
-}
 
 /**
  * Return categories for the export UI.
@@ -122,6 +106,8 @@ export async function listExportCategories(): Promise<ExportCategory[]> {
 
   // Group files by top-level directory
   const filesByCategory = new Map<string, ExportFileInfo[]>();
+  // Track unique top-level items per category (e.g. skill dirs, not individual files)
+  const itemsByCategory = new Map<string, Set<string>>();
 
   for (const rel of allPaths) {
     const sep = rel.indexOf('/');
@@ -129,16 +115,22 @@ export async function listExportCategories(): Promise<ExportCategory[]> {
     const nameInCategory = sep === -1 ? rel : rel.slice(sep + 1);
     if (!filesByCategory.has(segment)) filesByCategory.set(segment, []);
     filesByCategory.get(segment)!.push({ name: nameInCategory, relativePath: rel });
+    // Count unique top-level items within the category
+    if (!itemsByCategory.has(segment)) itemsByCategory.set(segment, new Set());
+    const itemSep = nameInCategory.indexOf('/');
+    itemsByCategory.get(segment)!.add(itemSep === -1 ? nameInCategory : nameInCategory.slice(0, itemSep));
   }
 
   // Known capability dirs — shown first but only if they have files
   for (const id of KNOWN_CAPABILITY_DIRS) {
     const files = filesByCategory.get(id);
     if (!files || files.length === 0) continue;
+    const items = itemsByCategory.get(id)?.size ?? files.length;
     categories.push({
       id,
       label: CATEGORY_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1),
       description: CATEGORY_DESCRIPTIONS[id] ?? '',
+      itemCount: items,
       fileCount: files.length,
       files,
     });
@@ -152,6 +144,7 @@ export async function listExportCategories(): Promise<ExportCategory[]> {
       id: '__root__',
       label: CATEGORY_LABELS['__root__'],
       description: CATEGORY_DESCRIPTIONS['__root__'],
+      itemCount: rootFiles.length,
       fileCount: rootFiles.length,
       files: rootFiles,
     });
@@ -161,10 +154,12 @@ export async function listExportCategories(): Promise<ExportCategory[]> {
   // Dynamically discovered dirs not in the known list
   for (const [id, files] of filesByCategory) {
     if (seen.has(id)) continue;
+    const items = itemsByCategory.get(id)?.size ?? files.length;
     categories.push({
       id,
       label: CATEGORY_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1),
       description: CATEGORY_DESCRIPTIONS[id] ?? '',
+      itemCount: items,
       fileCount: files.length,
       files,
     });
@@ -180,6 +175,7 @@ export async function listExportCategories(): Promise<ExportCategory[]> {
         id: '__home__',
         label: CATEGORY_LABELS['__home__'],
         description: CATEGORY_DESCRIPTIONS['__home__'],
+        itemCount: 1,
         fileCount: 1,
         files: [{ name: adapter.mcpConfigFile, relativePath: `__home__/${adapter.mcpConfigFile}` }],
       });
@@ -204,9 +200,10 @@ async function scanFilePaths(dir: string, base: string, paths: string[]): Promis
     const fullPath = `${dir}/${e.name}`;
     const rel = fullPath.slice(base.length + 1);
     if (e.isDir) {
-      if (SKIP_DIRS.has(e.name)) continue;
+      if (SKIP_DIRS.has(e.name) || e.name.startsWith('.')) continue;
       await scanFilePaths(fullPath, base, paths);
     } else {
+      if (SKIP_FILES.has(e.name)) continue;
       paths.push(rel);
     }
   }
@@ -227,9 +224,10 @@ async function collectFiles(dir: string, base: string, files: BackupFile[]): Pro
     const fullPath = `${dir}/${e.name}`;
     const rel = fullPath.slice(base.length + 1);
     if (e.isDir) {
-      if (SKIP_DIRS.has(e.name)) continue;
+      if (SKIP_DIRS.has(e.name) || e.name.startsWith('.')) continue;
       await collectFiles(fullPath, base, files);
     } else {
+      if (SKIP_FILES.has(e.name)) continue;
       try {
         const content = await readFile(fullPath);
         files.push({ relativePath: rel, content });
