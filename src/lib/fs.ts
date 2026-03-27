@@ -18,13 +18,19 @@ import { getAdapter } from "./adapters/index";
  */
 export async function claudeDir(): Promise<string> {
   const config = await loadAppConfig();
+  const adapter = getAdapter(config.activeCli);
+  // Per-CLI override takes priority
+  const cliOverride = config.cliDirs?.[adapter.id];
+  if (cliOverride) {
+    return cliOverride.endsWith("/") || cliOverride.endsWith("\\") ? cliOverride.slice(0, -1) : cliOverride;
+  }
+  // Legacy single-dir override (backwards compat, only applies to active CLI)
   if (config.claudeDir) {
     const p = config.claudeDir;
     return p.endsWith("/") || p.endsWith("\\") ? p.slice(0, -1) : p;
   }
   const home = await homeDir();
   const base = home.endsWith("/") ? home.slice(0, -1) : home;
-  const adapter = getAdapter(config.activeCli);
   return `${base}/${adapter.configDirName}`;
 }
 

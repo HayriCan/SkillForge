@@ -24,7 +24,8 @@
   import Backup from '../views/Backup.svelte';
   import FolderView from '../views/FolderView.svelte';
   import { claudeDir, listDirFull, readFile } from '../lib/fs';
-  import { getActiveAdapter } from '../lib/adapters/index';
+  import { getActiveAdapter, detectInstalledClis } from '../lib/adapters/index';
+  import type { CliAdapter } from '../lib/adapters/types';
   import { loadSettings } from '../lib/settings';
   import { listProfiles, autoSaveDefault } from '../lib/profiles';
   import { loadMcpConfig } from '../lib/mcp';
@@ -66,6 +67,10 @@
   let initialSelect = $state('');
   let prefClaudeDir = $state('');
   let prefDefaultDir = $state('');
+  let prefHomePath = $state('');
+  let prefInstalledClis = $state<CliAdapter[]>([]);
+  let prefActiveAdapter = $state<CliAdapter | null>(null);
+  let prefCliDirs = $state<Record<string, string>>({});
   let backupSection = $state('');
   let showLangDropdown = $state(false);
 
@@ -83,11 +88,23 @@
       case 'homepage':
         await openUrl('https://github.com/HayriCan/SkillForge');
         break;
-      case 'preferences':
-        prefDefaultDir = `${(await homeDir()).replace(/[/\\]$/, '')}/.claude`;
+      case 'preferences': {
+        const h = (await homeDir()).replace(/[/\\]$/, '');
+        prefHomePath = h;
+        prefActiveAdapter = await getActiveAdapter();
+        prefDefaultDir = `${h}/${prefActiveAdapter.configDirName}`;
         prefClaudeDir = (await claudeDir());
+        prefInstalledClis = await detectInstalledClis();
+        const cfg = await loadAppConfig();
+        // Build per-CLI dir map: override or default
+        const dirs: Record<string, string> = {};
+        for (const cli of prefInstalledClis) {
+          dirs[cli.id] = cfg.cliDirs?.[cli.id] ?? `${h}/${cli.configDirName}`;
+        }
+        prefCliDirs = dirs;
         showPreferences = true;
         break;
+      }
       case 'export':
         backupSection = 'export';
         activeView = 'backup';
@@ -109,12 +126,24 @@
     showLangDropdown = false;
     try {
       const config = await loadAppConfig();
-      const trimmed = prefClaudeDir.trim();
-      if (!trimmed || trimmed === prefDefaultDir) {
-        delete config.claudeDir;
-      } else {
-        config.claudeDir = trimmed;
+      // Save per-CLI directory overrides
+      const cliDirs: Record<string, string> = {};
+      let hasOverrides = false;
+      for (const cli of prefInstalledClis) {
+        const val = prefCliDirs[cli.id]?.trim() ?? '';
+        const defaultDir = `${prefHomePath}/${cli.configDirName}`;
+        if (val && val !== defaultDir) {
+          cliDirs[cli.id] = val;
+          hasOverrides = true;
+        }
       }
+      if (hasOverrides) {
+        config.cliDirs = cliDirs;
+      } else {
+        delete config.cliDirs;
+      }
+      // Clean up legacy claudeDir
+      delete config.claudeDir;
       await saveAppConfig(config);
       addToast(t('toast.preferences_saved'), 'success');
       loadAllCounts();
@@ -423,16 +452,34 @@
             </div>
           </div>
 
-          <!-- Claude Directory -->
+          <!-- CLI Directories -->
           <div>
-            <label class="text-[13px] text-[var(--text-secondary)] block mb-1.5" for="pref-claude-dir">{t('pref.claude_dir')}</label>
-            <input
-              id="pref-claude-dir"
-              bind:value={prefClaudeDir}
-              placeholder={prefDefaultDir}
-              class="w-full bg-[var(--surface-1)] border border-[var(--border-subtle)] rounded px-3 py-2 text-[12px] text-[var(--text-primary)] font-mono outline-none focus:border-[var(--accent)] transition-colors"
-            />
-            <p class="text-[10px] text-[var(--text-ghost)] mt-1">Default: {prefDefaultDir}</p>
+            <label class="text-[13px] text-[var(--text-secondary)] block mb-2">CLI Directories</label>
+            <div class="flex flex-col gap-3">
+              {#each prefInstalledClis as cli}
+                {@const defaultDir = `${prefHomePath}/${cli.configDirName}`}
+                {@const isCustom = prefCliDirs[cli.id] !== defaultDir}
+                <div>
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="w-2 h-2 rounded-full shrink-0
+                      {cli.id === 'claude' ? 'bg-orange-400' : cli.id === 'codex' ? 'bg-green-400' : 'bg-blue-400'}"></span>
+                    <span class="text-[12px] font-medium text-[var(--text-secondary)]">{cli.label}</span>
+                    {#if prefActiveAdapter?.id === cli.id}
+                      <span class="text-[9px] px-1.5 py-0.5 rounded bg-[var(--success)]/15 text-[var(--success)] font-semibold">active</span>
+                    {/if}
+                    {#if isCustom}
+                      <span class="text-[9px] px-1.5 py-0.5 rounded bg-[var(--warning)]/10 text-[var(--warning)] font-semibold">custom</span>
+                    {/if}
+                  </div>
+                  <input
+                    bind:value={prefCliDirs[cli.id]}
+                    placeholder={defaultDir}
+                    class="w-full bg-[var(--surface-1)] border border-[var(--border-subtle)] rounded px-3 py-1.5 text-[11px] text-[var(--text-primary)] font-mono outline-none focus:border-[var(--accent)] transition-colors"
+                  />
+                  <p class="text-[9px] text-[var(--text-ghost)] mt-0.5">Default: {defaultDir}</p>
+                </div>
+              {/each}
+            </div>
           </div>
         </div>
 

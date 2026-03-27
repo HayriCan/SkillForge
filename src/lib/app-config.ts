@@ -9,7 +9,10 @@ import { appDataDir } from "@tauri-apps/api/path";
 import type { CliId } from './adapters/types';
 
 export type AppConfig = {
+  /** @deprecated Use cliDirs instead. Kept for backwards compatibility. */
   claudeDir?: string;
+  /** Per-CLI config directory overrides. Key: CliId, Value: absolute path */
+  cliDirs?: Partial<Record<string, string>>;
   /** Active CLI adapter id; defaults to 'claude' when absent */
   activeCli?: CliId;
   /**
