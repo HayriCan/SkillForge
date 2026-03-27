@@ -230,8 +230,9 @@
   async function doFullBackup() {
     fullBackupRunning = true;
     fullBackupResult = null;
-    // Ensure the loading state renders before the blocking IPC call
+    // Wait for the browser to paint the loading state before the blocking IPC call
     await tick();
+    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 50)));
     try {
       const { path, sizeBytes } = await createFullBackup();
       fullBackupResult = { path, size: formatSize(sizeBytes) };
@@ -379,8 +380,9 @@
         onclick={doFullBackup}
         disabled={fullBackupRunning}
         class="px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-200 flex items-center gap-1.5
-               bg-[var(--success)]/15 border border-[var(--success)]/30 text-[var(--success)]
-               hover:bg-[var(--success)]/25 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-black/5"
+               {fullBackupRunning
+                 ? 'bg-[var(--surface-3)] border border-[var(--border-subtle)] text-[var(--text-ghost)] cursor-not-allowed pointer-events-none'
+                 : 'bg-[var(--success)]/15 border border-[var(--success)]/30 text-[var(--success)] hover:bg-[var(--success)]/25 shadow-sm shadow-black/5'}"
       >
         {#if fullBackupRunning}
           <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
