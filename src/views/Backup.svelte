@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import { open } from '@tauri-apps/plugin-dialog';
-  import { exportBackup, importBackup, listExportCategories, type ExportCategory } from '../lib/backup';
+  import { exportBackup, importBackup, listExportCategories, createFullBackup, type ExportCategory } from '../lib/backup';
   import { addToast } from '../lib/toast.svelte';
 
   let { initialSection = '' } = $props<{ initialSection?: string }>();
@@ -26,6 +26,10 @@
   let selectedIds = $state<Set<string>>(new Set());
   let categoriesLoading = $state(true);
   let showAdditional = $state(false);
+
+  // Full backup state
+  let fullBackupRunning = $state(false);
+  let fullBackupResult = $state<{ path: string; size: string } | null>(null);
 
   // Import state
   let importing = $state(false);
@@ -98,6 +102,26 @@
     }
   }
 
+  function formatSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  async function doFullBackup() {
+    fullBackupRunning = true;
+    fullBackupResult = null;
+    try {
+      const { path, sizeBytes } = await createFullBackup();
+      fullBackupResult = { path, size: formatSize(sizeBytes) };
+      addToast(`Full backup created (${formatSize(sizeBytes)})`, 'success');
+    } catch (e) {
+      addToast(`Full backup failed: ${e}`, 'error');
+    } finally {
+      fullBackupRunning = false;
+    }
+  }
+
   async function doImport() {
     if (!importPath.trim()) return;
     importing = true;
@@ -142,6 +166,49 @@
     <p class="text-[11px] text-[var(--text-ghost)]">
       Export your <code class="font-mono text-[var(--accent-dim)]">.claude</code> config as a portable bundle, or restore from a previous backup.
     </p>
+  </div>
+
+  <!-- Full Backup section -->
+  <div class="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-2)] mb-3 overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-4">
+      <div class="flex items-center gap-2.5">
+        <div class="w-6 h-6 rounded-md bg-[var(--success)]/15 flex items-center justify-center">
+          <span class="text-[var(--success)] text-[11px] font-bold leading-none">⛨</span>
+        </div>
+        <div>
+          <h3 class="text-[13px] font-semibold text-[var(--text-primary)]">Full Backup</h3>
+          <p class="text-[10px] text-[var(--text-ghost)] mt-0.5">
+            Creates a <code class="font-mono text-[var(--accent-dim)]">.tar.gz</code> of the entire
+            <code class="font-mono text-[var(--accent-dim)]">~/.claude/</code> directory and
+            <code class="font-mono text-[var(--accent-dim)]">~/.claude.json</code>
+          </p>
+        </div>
+      </div>
+      <button
+        onclick={doFullBackup}
+        disabled={fullBackupRunning}
+        class="px-3.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-200 flex items-center gap-1.5
+               bg-[var(--success)]/15 border border-[var(--success)]/30 text-[var(--success)]
+               hover:bg-[var(--success)]/25 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm shadow-black/5"
+      >
+        {#if fullBackupRunning}
+          <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          Creating…
+        {:else}
+          Create Backup
+        {/if}
+      </button>
+    </div>
+    {#if fullBackupResult}
+      <div class="mx-5 mb-4 flex items-center gap-2 p-2.5 rounded-lg bg-[var(--success)]/8 border border-[var(--success)]/20 animate-fade-in">
+        <span class="text-[var(--success)] text-[11px]">✓</span>
+        <span class="text-[11px] font-mono text-[var(--text-ghost)] truncate flex-1">{fullBackupResult.path}</span>
+        <span class="text-[10px] font-mono text-[var(--text-ghost)] shrink-0">{fullBackupResult.size}</span>
+      </div>
+    {/if}
   </div>
 
   <!-- Export section -->

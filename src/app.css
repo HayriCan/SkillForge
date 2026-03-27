@@ -160,6 +160,10 @@
     50% { box-shadow: 0 0 12px 2px var(--accent-glow); }
   }
 
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
   .animate-fade-in {
     animation: fade-in 0.2s ease-out both;
   }
@@ -182,6 +186,10 @@
 
   .animate-glow {
     animation: glow-pulse 2s ease-in-out infinite;
+  }
+
+  .animate-spin {
+    animation: spin 0.8s linear infinite;
   }
 
   /* Staggered list animation */

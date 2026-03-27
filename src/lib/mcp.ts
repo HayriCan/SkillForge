@@ -1,6 +1,15 @@
 import { readFile, writeFile, claudeDir } from './fs';
+import { invoke } from '@tauri-apps/api/core';
 import { homeDir } from '@tauri-apps/api/path';
 import { getActiveAdapter } from './adapters/index';
+
+/**
+ * Read a file relative to $HOME/.claude/plugins/ via Rust IPC.
+ * Bypasses Tauri FS scope which has issues with deep marketplace paths on WSL.
+ */
+async function readPluginFile(relativePath: string): Promise<string> {
+  return invoke<string>('read_plugin_file', { relativePath });
+}
 
 export type McpServerType = 'stdio' | 'sse' | 'http';
 
@@ -18,7 +27,7 @@ export type McpConfig = {
 };
 
 /** Where a server is stored */
-export type McpScope = 'user' | 'project';
+export type McpScope = 'user' | 'project' | 'plugin';
 
 export type ScopedMcpEntry = {
   name: string;
@@ -26,6 +35,8 @@ export type ScopedMcpEntry = {
   scope: McpScope;
   /** Absolute project path for project-scoped entries */
   projectPath?: string;
+  /** Plugin ID (e.g. "slack@claude-plugins-official") for plugin-scoped entries */
+  pluginId?: string;
 };
 
 /**
@@ -96,21 +107,93 @@ export async function saveMcpConfig(config: McpConfig): Promise<void> {
 
 
 /**
+ * Load MCP servers from all enabled plugins.
+ * Reads enabledPlugins from settings.json, resolves marketplace install locations
+ * from known_marketplaces.json, then reads each plugin's .mcp.json.
+ *
+ * Plugin id format in enabledPlugins: "pluginName@marketplaceName"
+ * .mcp.json location: {marketplace.installLocation}/plugins/{name}/.mcp.json
+ *                   or {marketplace.installLocation}/external_plugins/{name}/.mcp.json
+ */
+async function loadPluginMcpEntries(): Promise<ScopedMcpEntry[]> {
+  try {
+    // enabledPlugins from settings.json (readable via Tauri FS scope)
+    const base = await claudeDir();
+    const settingsRaw = await readFile(`${base}/settings.json`).catch(() => '{}');
+    const settings = JSON.parse(settingsRaw) as Record<string, unknown>;
+    const enabledPlugins = (settings.enabledPlugins ?? {}) as Record<string, boolean>;
+
+    // Marketplace locations via Rust IPC (deep paths fail Tauri FS scope on WSL)
+    const marketplacesRaw = await readPluginFile('known_marketplaces.json').catch(() => '{}');
+    const marketplaces = JSON.parse(marketplacesRaw) as Record<string, { installLocation?: string }>;
+
+    const results: ScopedMcpEntry[] = [];
+
+    for (const [pluginId, enabled] of Object.entries(enabledPlugins)) {
+      if (!enabled) continue;
+
+      const atIdx = pluginId.lastIndexOf('@');
+      if (atIdx <= 0) continue;
+      const pluginName = pluginId.slice(0, atIdx);
+      const marketplaceName = pluginId.slice(atIdx + 1);
+
+      if (!marketplaces[marketplaceName]) continue;
+
+      // Try both plugins/ and external_plugins/ directories
+      for (const subDir of ['plugins', 'external_plugins']) {
+        try {
+          const relPath = `marketplaces/${marketplaceName}/${subDir}/${pluginName}/.mcp.json`;
+          const mcpRaw = await readPluginFile(relPath);
+          const mcpData = JSON.parse(mcpRaw) as Record<string, unknown>;
+
+          // .mcp.json can be either { mcpServers: { name: server } } or { name: server } (flat)
+          const servers = (mcpData.mcpServers ?? mcpData) as Record<string, unknown>;
+          for (const [name, serverDef] of Object.entries(servers)) {
+            if (typeof serverDef !== 'object' || serverDef === null || !('type' in serverDef)) continue;
+            results.push({ name, server: serverDef as McpServer, scope: 'plugin', pluginId });
+          }
+          break;
+        } catch {
+          // .mcp.json not in this subDir, try next
+        }
+      }
+    }
+
+    return results;
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Load all MCP servers across user-level and all project scopes from ~/.claude.json.
  * Returns entries tagged with their scope and project path.
  */
 export async function loadAllMcpEntries(): Promise<ScopedMcpEntry[]> {
-  const filePath = await claudeJsonPath();
+  const [filePath, base] = await Promise.all([claudeJsonPath(), claudeDir()]);
+
+  const results: ScopedMcpEntry[] = [];
+
+  // settings.json and settings.local.json (user-level, Claude Code specific)
+  const [fromSettings, fromLocal] = await Promise.all([
+    readMcpServersFrom(`${base}/settings.json`),
+    readMcpServersFrom(`${base}/settings.local.json`),
+  ]);
+  for (const [name, server] of Object.entries({ ...fromSettings, ...fromLocal })) {
+    results.push({ name, server, scope: 'user' });
+  }
+
+  // ~/.claude.json (primary config — user-level + project-level)
   try {
     const raw = await readFile(filePath);
     const data = JSON.parse(raw) as Record<string, unknown>;
 
-    const results: ScopedMcpEntry[] = [];
-
-    // User-level
+    // User-level (skip duplicates already found in settings files)
     const userServers = (data.mcpServers ?? {}) as Record<string, McpServer>;
     for (const [name, server] of Object.entries(userServers)) {
-      results.push({ name, server, scope: 'user' });
+      if (!results.some((e) => e.name === name && e.scope === 'user')) {
+        results.push({ name, server, scope: 'user' });
+      }
     }
 
     // Project-level
@@ -121,11 +204,15 @@ export async function loadAllMcpEntries(): Promise<ScopedMcpEntry[]> {
         results.push({ name, server, scope: 'project', projectPath });
       }
     }
-
-    return results;
   } catch {
-    return [];
+    // ~/.claude.json missing or unreadable — continue with plugin entries
   }
+
+  // Plugin-level (read-only, managed by plugin system)
+  const pluginEntries = await loadPluginMcpEntries();
+  results.push(...pluginEntries);
+
+  return results;
 }
 
 /**

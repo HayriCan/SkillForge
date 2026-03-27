@@ -88,7 +88,7 @@ const T: TranslationMap = {
   'pref.ok':         ['OK', 'OK', 'OK', 'OK', 'OK', 'OK', 'Tamam', '确定', '確定'],
 
   // ── About modal ──
-  'about.description': ['Claude Code configuration manager.', 'Claude Code Konfigurationsmanager.', 'Gestionnaire de configuration Claude Code.', 'Claude Code構成マネージャー。', 'Claude Code 구성 관리자.', 'Menedżer konfiguracji Claude Code.', 'Claude Code yapılandırma yöneticisi.', 'Claude Code 配置管理器。', 'Claude Code 配置管理器。'],
+  'about.description': ['Configuration manager for Claude Code, Codex CLI, and Gemini CLI.', 'Konfigurationsmanager für Claude Code, Codex CLI und Gemini CLI.', 'Gestionnaire de configuration pour Claude Code, Codex CLI et Gemini CLI.', 'Claude Code・Codex CLI・Gemini CLI構成マネージャー。', 'Claude Code, Codex CLI, Gemini CLI 구성 관리자.', 'Menedżer konfiguracji Claude Code, Codex CLI i Gemini CLI.', 'Claude Code, Codex CLI ve Gemini CLI yapılandırma yöneticisi.', 'Claude Code、Codex CLI 和 Gemini CLI 配置管理器。', 'Claude Code、Codex CLI 和 Gemini CLI 配置管理器。'],
   'about.homepage':    ['Homepage', 'Startseite', "Page d'accueil", 'ホームページ', '홈페이지', 'Strona główna', 'Anasayfa', '主页', '首頁'],
   'about.source':      ['Source Code', 'Quellcode', 'Code source', 'ソースコード', '소스 코드', 'Kod źródłowy', 'Kaynak Kod', '源代码', '原始碼'],
   'about.close':       ['Close', 'Schließen', 'Fermer', '閉じる', '닫기', 'Zamknij', 'Kapat', '关闭', '關閉'],
@@ -152,6 +152,30 @@ const T: TranslationMap = {
   'update.error_notarization': ['The update was blocked by platform security checks. On macOS, confirm the app is notarized and trusted.', 'The update was blocked by platform security checks. On macOS, confirm the app is notarized and trusted.', 'The update was blocked by platform security checks. On macOS, confirm the app is notarized and trusted.', 'The update was blocked by platform security checks. On macOS, confirm the app is notarized and trusted.', 'The update was blocked by platform security checks. On macOS, confirm the app is notarized and trusted.', 'The update was blocked by platform security checks. On macOS, confirm the app is notarized and trusted.', 'The update was blocked by platform security checks. On macOS, confirm the app is notarized and trusted.', 'The update was blocked by platform security checks. On macOS, confirm the app is notarized and trusted.', 'The update was blocked by platform security checks. On macOS, confirm the app is notarized and trusted.'],
   'update.error_generic': ['Skill Forge could not finish the update. Try again or install the latest release manually.', 'Skill Forge could not finish the update. Try again or install the latest release manually.', 'Skill Forge could not finish the update. Try again or install the latest release manually.', 'Skill Forge could not finish the update. Try again or install the latest release manually.', 'Skill Forge could not finish the update. Try again or install the latest release manually.', 'Skill Forge could not finish the update. Try again or install the latest release manually.', 'Skill Forge could not finish the update. Try again or install the latest release manually.', 'Skill Forge could not finish the update. Try again or install the latest release manually.', 'Skill Forge could not finish the update. Try again or install the latest release manually.'],
   'update.remind_me_later': ['Update dismissed for now. You can reopen it from Check for Updates.', 'Update dismissed for now. You can reopen it from Check for Updates.', 'Update dismissed for now. You can reopen it from Check for Updates.', 'Update dismissed for now. You can reopen it from Check for Updates.', 'Update dismissed for now. You can reopen it from Check for Updates.', 'Update dismissed for now. You can reopen it from Check for Updates.', 'Update dismissed for now. You can reopen it from Check for Updates.', 'Update dismissed for now. You can reopen it from Check for Updates.', 'Update dismissed for now. You can reopen it from Check for Updates.'],
+
+  // ── Resource config popover ──
+  'res.visible':       ['Visible Resources', 'Sichtbare Ressourcen', 'Ressources visibles', '表示リソース', '표시 리소스', 'Widoczne zasoby', 'Görünen Kaynaklar', '可见资源', '可見資源'],
+  'res.builtin':       ['Built-in', 'Integriert', 'Intégré', '組み込み', '기본 제공', 'Wbudowane', 'Yerleşik', '内置', '內建'],
+  'res.custom':        ['Custom', 'Benutzerdefiniert', 'Personnalisé', 'カスタム', '사용자 정의', 'Niestandardowe', 'Özel', '自定义', '自訂'],
+  'res.auto':          ['auto', 'auto', 'auto', '自動', '자동', 'auto', 'otomatik', '自动', '自動'],
+
+  // ── FolderView ──
+  'folder.empty':      ['Empty folder', 'Leerer Ordner', 'Dossier vide', '空のフォルダ', '빈 폴더', 'Pusty folder', 'Boş klasör', '空文件夹', '空資料夾'],
+  'folder.select':     ['Select a file to preview', 'Datei zum Anzeigen auswählen', 'Sélectionnez un fichier', 'ファイルを選択してプレビュー', '파일을 선택하여 미리보기', 'Wybierz plik do podglądu', 'Önizlemek için dosya seçin', '选择文件预览', '選擇檔案預覽'],
+  'folder.binary':     ['Binary file — preview not available', 'Binärdatei — keine Vorschau', 'Fichier binaire — aperçu non disponible', 'バイナリファイル — プレビュー不可', '바이너리 파일 — 미리보기 불가', 'Plik binarny — podgląd niedostępny', 'İkili dosya — önizleme mevcut değil', '二进制文件 — 无法预览', '二進位檔案 — 無法預覽'],
+  'folder.items':      ['{n} items', '{n} Elemente', '{n} éléments', '{n} 項目', '{n}개 항목', '{n} elementów', '{n} öğe', '{n} 个项目', '{n} 個項目'],
+  'folder.copy_path':  ['Copy Path', 'Pfad kopieren', 'Copier le chemin', 'パスをコピー', '경로 복사', 'Kopiuj ścieżkę', 'Yolu Kopyala', '复制路径', '複製路徑'],
+
+  // ── Editor modes ──
+  'editor.rich':       ['Rich', 'Rich', 'Rich', 'リッチ', '리치', 'Rich', 'Zengin', 'Rich', 'Rich'],
+  'editor.raw':        ['Raw', 'Roh', 'Brut', 'Raw', 'Raw', 'Surowy', 'Ham', '原始', '原始'],
+  'editor.source':     ['Source', 'Quelle', 'Source', 'ソース', '소스', 'Źródło', 'Kaynak', '源码', '原始碼'],
+  'editor.preview':    ['Preview', 'Vorschau', 'Aperçu', 'プレビュー', '미리보기', 'Podgląd', 'Önizleme', '预览', '預覽'],
+  'editor.saving':     ['Saving...', 'Speichern...', 'Enregistrement...', '保存中...', '저장 중...', 'Zapisywanie...', 'Kaydediliyor...', '保存中...', '儲存中...'],
+  'editor.unsaved':    ['unsaved', 'ungespeichert', 'non enregistré', '未保存', '미저장', 'niezapisane', 'kaydedilmedi', '未保存', '未儲存'],
+
+  // ── Settings: Global Instructions ──
+  'settings.global_instructions': ['Global Instructions', 'Globale Anweisungen', 'Instructions globales', 'グローバル指示', '전역 지시사항', 'Instrukcje globalne', 'Genel Talimatlar', '全局指令', '全域指令'],
 
   // ── Toasts ──
   'toast.preferences_saved': ['Preferences saved', 'Einstellungen gespeichert', 'Préférences enregistrées', '設定を保存しました', '환경설정 저장됨', 'Preferencje zapisane', 'Tercihler kaydedildi', '偏好设置已保存', '偏好設定已儲存'],

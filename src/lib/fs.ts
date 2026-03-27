@@ -72,6 +72,19 @@ export async function getCreatedAt(path: string): Promise<Date | null> {
   }
 }
 
+/** Returns file/dir stat info (size in bytes, modified date) */
+export async function getFileStat(path: string): Promise<{ size: number; modified: Date | null }> {
+  try {
+    const info = await fsStat(path);
+    return {
+      size: info.size ?? 0,
+      modified: info.mtime ? new Date(info.mtime) : null,
+    };
+  } catch {
+    return { size: 0, modified: null };
+  }
+}
+
 /** Directories that never contain CLAUDE.md/MEMORY.md — skip for performance */
 const SKIP_DIRS = new Set([
   "sessions", "tasks", "todos", "teams", "hooks", "cache",

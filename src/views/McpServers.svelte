@@ -265,32 +265,41 @@
         {#each entries as entry}
           <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
           <div
-            onclick={() => { selected = entry; openEdit(entry); }}
+            onclick={() => { selected = entry; if (entry.scope !== 'plugin') openEdit(entry); else showAdd = false; }}
             class="group w-full text-left px-4 py-3 border-b border-[var(--border-subtle)] transition-all duration-200 relative cursor-pointer
-                   {selected?.name === entry.name && selected?.projectPath === entry.projectPath ? 'bg-[var(--surface-3)]' : 'hover:bg-[var(--surface-2)]'}"
+                   {entry.scope === 'plugin' ? 'opacity-90' : ''}
+                   {selected?.name === entry.name && selected?.projectPath === entry.projectPath ? 'bg-[var(--surface-3)]' : entry.scope !== 'plugin' ? 'hover:bg-[var(--surface-2)]' : ''}"
           >
             {#if selected?.name === entry.name && selected?.projectPath === entry.projectPath}
               <div class="absolute left-0 top-0 bottom-0 w-[2px] bg-[var(--accent)]"></div>
             {/if}
             <div class="flex items-center justify-between gap-2">
               <div class="flex items-center gap-2 min-w-0">
-                <button
-                  onclick={(e) => { e.stopPropagation(); toggle(entry); }}
-                  class="w-3 h-3 rounded-full shrink-0 transition-colors duration-200 {entry.server.disabled ? 'bg-[var(--border-default)]' : 'bg-[var(--success)]'}"
-                  aria-label={entry.server.disabled ? 'Enable server' : 'Disable server'}
-                ></button>
+                {#if entry.scope === 'plugin'}
+                  <div class="w-3 h-3 rounded-full shrink-0 bg-[var(--accent-dim)] opacity-60"></div>
+                {:else}
+                  <button
+                    onclick={(e) => { e.stopPropagation(); toggle(entry); }}
+                    class="w-3 h-3 rounded-full shrink-0 transition-colors duration-200 {entry.server.disabled ? 'bg-[var(--border-default)]' : 'bg-[var(--success)]'}"
+                    aria-label={entry.server.disabled ? 'Enable server' : 'Disable server'}
+                  ></button>
+                {/if}
                 <span class="text-[13px] truncate font-mono {entry.server.disabled ? 'text-[var(--text-ghost)] line-through' : 'text-[var(--text-secondary)]'}">{entry.name}</span>
               </div>
               <div class="flex items-center gap-1.5 shrink-0">
                 <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--text-ghost)]">{entry.server.type}</span>
-                {#if entry.scope === 'project'}
+                {#if entry.scope === 'plugin'}
+                  <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[var(--accent-subtle)] text-[var(--accent-dim)]" title={entry.pluginId}>plugin</span>
+                {:else if entry.scope === 'project'}
                   <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[var(--accent-subtle)] text-[var(--accent-dim)]" title={entry.projectPath}>local</span>
                 {/if}
-                <button
-                  onclick={(e) => { e.stopPropagation(); remove(entry); }}
-                  class="opacity-0 group-hover:opacity-100 w-5 h-5 rounded flex items-center justify-center text-[var(--text-ghost)] hover:text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-all duration-150"
-                  aria-label="Remove server"
-                ><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                {#if entry.scope !== 'plugin'}
+                  <button
+                    onclick={(e) => { e.stopPropagation(); remove(entry); }}
+                    class="opacity-0 group-hover:opacity-100 w-5 h-5 rounded flex items-center justify-center text-[var(--text-ghost)] hover:text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-all duration-150"
+                    aria-label="Remove server"
+                  ><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                {/if}
               </div>
             </div>
             {#if entry.server.command}
@@ -300,6 +309,8 @@
             {/if}
             {#if entry.scope === 'project' && entry.projectPath}
               <div class="text-[9px] text-[var(--text-ghost)] truncate mt-0.5 ml-5 opacity-60">{entry.projectPath}</div>
+            {:else if entry.scope === 'plugin' && entry.pluginId}
+              <div class="text-[9px] text-[var(--text-ghost)] truncate mt-0.5 ml-5 opacity-60">{entry.pluginId}</div>
             {/if}
           </div>
         {/each}
@@ -453,11 +464,67 @@
         </div>
       </div>
     </div>
+  {:else if !showAdd && selected?.scope === 'plugin'}
+    <!-- Read-only plugin detail view -->
+    <div class="flex-1 min-w-0 flex flex-col px-8 py-6 animate-fade-in overflow-y-auto">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-8 h-8 rounded-lg bg-[var(--accent-subtle)] flex items-center justify-center">
+          <svg class="w-4 h-4 text-[var(--accent-dim)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.5 16.875h3.375m0 0h3.375m-3.375 0V13.5m0 3.375v3.375M6 10.5h2.25a2.25 2.25 0 002.25-2.25V6a2.25 2.25 0 00-2.25-2.25H6A2.25 2.25 0 003.75 6v2.25A2.25 2.25 0 006 10.5zm0 9.75h2.25A2.25 2.25 0 0010.5 18v-2.25a2.25 2.25 0 00-2.25-2.25H6a2.25 2.25 0 00-2.25 2.25V18A2.25 2.25 0 006 20.25zm9.75-9.75H18a2.25 2.25 0 002.25-2.25V6A2.25 2.25 0 0018 3.75h-2.25A2.25 2.25 0 0013.5 6v2.25a2.25 2.25 0 002.25 2.25z"/></svg>
+        </div>
+        <div>
+          <h2 class="text-[15px] font-semibold text-[var(--text-primary)]">{selected.name}</h2>
+          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--accent-subtle)] text-[var(--accent-dim)]">plugin</span>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-4 max-w-md">
+        <div>
+          <label class="block text-[10px] text-[var(--text-ghost)] uppercase tracking-wider mb-1">Transport</label>
+          <div class="px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)] text-[13px] font-mono text-[var(--text-secondary)]">{selected.server.type}</div>
+        </div>
+
+        {#if selected.server.url}
+          <div>
+            <label class="block text-[10px] text-[var(--text-ghost)] uppercase tracking-wider mb-1">URL</label>
+            <div class="px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)] text-[13px] font-mono text-[var(--text-secondary)] break-all">{selected.server.url}</div>
+          </div>
+        {/if}
+
+        {#if selected.server.command}
+          <div>
+            <label class="block text-[10px] text-[var(--text-ghost)] uppercase tracking-wider mb-1">Command</label>
+            <div class="px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)] text-[13px] font-mono text-[var(--text-secondary)]">
+              {selected.server.command} {(selected.server.args ?? []).join(' ')}
+            </div>
+          </div>
+        {/if}
+
+        {#if selected.pluginId}
+          <div>
+            <label class="block text-[10px] text-[var(--text-ghost)] uppercase tracking-wider mb-1">Plugin</label>
+            <div class="px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)] text-[13px] font-mono text-[var(--text-secondary)]">{selected.pluginId}</div>
+          </div>
+        {/if}
+
+        {#if selected.server.env && Object.keys(selected.server.env).length > 0}
+          <div>
+            <label class="block text-[10px] text-[var(--text-ghost)] uppercase tracking-wider mb-1">Environment</label>
+            <div class="px-3 py-2 rounded-lg bg-[var(--surface-2)] border border-[var(--border-subtle)] text-[12px] font-mono text-[var(--text-secondary)]">
+              {#each Object.entries(selected.server.env) as [k, v]}
+                <div><span class="text-[var(--accent-dim)]">{k}</span>=<span class="text-[var(--text-ghost)]">{v || '•••'}</span></div>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        <p class="text-[11px] text-[var(--text-ghost)] mt-2 italic">Managed by plugin system — read-only</p>
+      </div>
+    </div>
   {:else if !showAdd && entries.length > 0}
     <div class="flex-1 flex items-center justify-center">
       <div class="text-center animate-fade-in-up max-w-xs">
         <div class="text-3xl text-[var(--text-ghost)] mb-3 opacity-50"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z"/></svg></div>
-        <p class="text-[13px] text-[var(--text-ghost)]">Select a server to edit it</p>
+        <p class="text-[13px] text-[var(--text-ghost)]">Select a server to view details</p>
       </div>
     </div>
   {/if}

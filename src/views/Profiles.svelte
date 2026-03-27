@@ -18,6 +18,7 @@
     type TemplateType,
     SNAPSHOT_DIRS,
   } from '../lib/profiles';
+  import { getActiveAdapter } from '../lib/adapters/index';
   import { estimateCurrentTokens, estimateProfileTokens, formatTokens, type TokenEstimate } from '../lib/tokenEstimator';
   import { switchToDefault } from '../lib/profiles';
   import ConfirmModal from '../components/ConfirmModal.svelte';
@@ -48,6 +49,7 @@
   let defaultTokenTotal = $state<number | null>(null);
   let saving = $state(false);
   let switching = $state(false);
+  let switchingTo = $state<string | null>(null);
   let trashOpen = $state(false);
   let copyFrom = $state('');
   let copyDirSel = $state<Record<string, boolean>>(Object.fromEntries(SNAPSHOT_DIRS.map((d) => [d, true])));
@@ -57,8 +59,9 @@
 
   async function load() {
     loading = true;
-    [profiles, trash] = await Promise.all([listProfiles(), listTrash()]);
-    activeProfile = getActiveProfile();
+    const [profilesData, trashData, adapter] = await Promise.all([listProfiles(), listTrash(), getActiveAdapter()]);
+    [profiles, trash] = [profilesData, trashData];
+    activeProfile = getActiveProfile(adapter.id);
     onCount(profiles.length);
     loading = false;
     // Background token fetch for all profiles
@@ -127,6 +130,8 @@
 
   async function switchToDefaultProfile() {
     switching = true;
+    switchingTo = 'Default';
+    const start = Date.now();
     try {
       await switchToDefault();
       activeProfile = null;
@@ -135,12 +140,17 @@
     } catch (e) {
       addToast(`Failed to switch: ${e}`, 'error');
     } finally {
+      const elapsed = Date.now() - start;
+      if (elapsed < 600) await new Promise((r) => setTimeout(r, 600 - elapsed));
       switching = false;
+      switchingTo = null;
     }
   }
 
   async function switchTo(profile: Profile) {
     switching = true;
+    switchingTo = profile.name;
+    const start = Date.now();
     try {
       await loadProfile(profile.name);
       activeProfile = profile.name;
@@ -149,7 +159,10 @@
     } catch (e) {
       addToast(`Failed to switch: ${e}`, 'error');
     } finally {
+      const elapsed = Date.now() - start;
+      if (elapsed < 600) await new Promise((r) => setTimeout(r, 600 - elapsed));
       switching = false;
+      switchingTo = null;
     }
   }
 
@@ -323,9 +336,11 @@
       {:else}
         <!-- Default (live state) entry -->
         <button
-          onclick={() => { selectedDefault = true; selected = null; copyFrom = ''; }}
+          onclick={() => { if (switching) return; selectedDefault = true; selected = null; copyFrom = ''; }}
+          disabled={switching}
           class="group w-full text-left px-4 py-3 border-b border-[var(--border-subtle)] transition-all duration-200 relative
-                 {selectedDefault ? 'bg-[var(--surface-3)]' : 'hover:bg-[var(--surface-2)]'}"
+                 {selectedDefault ? 'bg-[var(--surface-3)]' : 'hover:bg-[var(--surface-2)]'}
+                 disabled:pointer-events-none"
         >
           {#if selectedDefault}
             <div class="absolute left-0 top-0 bottom-0 w-[2px] bg-[var(--accent)]"></div>
@@ -355,9 +370,11 @@
 
         {#each profiles as profile}
           <button
-            onclick={() => { selected = profile; selectedDefault = false; copyFrom = ''; }}
+            onclick={() => { if (switching) return; selected = profile; selectedDefault = false; copyFrom = ''; }}
+            disabled={switching}
             class="group w-full text-left px-4 py-3 border-b border-[var(--border-subtle)] transition-all duration-200 relative
-                   {selected?.name === profile.name ? 'bg-[var(--surface-3)]' : 'hover:bg-[var(--surface-2)]'}"
+                   {selected?.name === profile.name ? 'bg-[var(--surface-3)]' : 'hover:bg-[var(--surface-2)]'}
+                   disabled:pointer-events-none"
           >
             {#if selected?.name === profile.name}
               <div class="absolute left-0 top-0 bottom-0 w-[2px] bg-[var(--accent)]"></div>
@@ -435,7 +452,24 @@
   </div>
 
   <!-- Detail panel -->
-  {#if selectedDefault}
+  {#if switching}
+    <div class="flex-1 min-w-0 flex flex-col items-center justify-center gap-4 animate-fade-in">
+      <!-- Spinner -->
+      <div class="relative w-12 h-12">
+        <div class="absolute inset-0 rounded-full border-2 border-[var(--border-subtle)]"></div>
+        <div class="absolute inset-0 rounded-full border-2 border-transparent border-t-[var(--accent)] animate-spin"></div>
+      </div>
+      <div class="text-center">
+        <p class="text-[13px] font-semibold text-[var(--text-primary)]">Loading Profile</p>
+        {#if switchingTo}
+          <p class="text-[11px] text-[var(--text-ghost)] font-mono mt-0.5">"{switchingTo}"</p>
+        {/if}
+      </div>
+      <p class="text-[10px] text-[var(--text-ghost)] max-w-[200px] text-center leading-relaxed">
+        Saving current state and restoring snapshot…
+      </p>
+    </div>
+  {:else if selectedDefault}
     <div class="flex-1 min-w-0 flex flex-col px-8 py-6 overflow-y-auto animate-fade-in">
       <div class="flex items-start justify-between mb-6">
         <div>

@@ -1,5 +1,6 @@
 import { readFile, writeFile, listDirFull, ensureDir, claudeDir } from './fs';
 import { homeDir } from '@tauri-apps/api/path';
+import { invoke } from '@tauri-apps/api/core';
 
 export type BackupFile = {
   relativePath: string;
@@ -283,4 +284,15 @@ export async function importBackup(
   }
 
   return { restored, skipped };
+}
+
+/**
+ * Create a full tar.gz backup of the entire ~/.claude/ directory and ~/.claude.json.
+ * Uses a Rust IPC command that calls system `tar`.
+ * Returns { path, sizeBytes } on success.
+ */
+export async function createFullBackup(): Promise<{ path: string; sizeBytes: number }> {
+  const result = await invoke<string>('create_full_backup');
+  const [path, sizeStr] = result.split('|');
+  return { path, sizeBytes: parseInt(sizeStr, 10) || 0 };
 }

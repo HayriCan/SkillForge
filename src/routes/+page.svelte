@@ -10,7 +10,6 @@
   import { registerShortcuts, isMac, increaseFontSize, decreaseFontSize, setFontSize, getFontSize } from '../lib/shortcuts';
   import Agents from '../views/Agents.svelte';
   import Commands from '../views/Commands.svelte';
-  import Config from '../views/Config.svelte';
   import Hooks from '../views/Hooks.svelte';
   import Plans from '../views/Plans.svelte';
   import Plugins from '../views/Plugins.svelte';
@@ -23,6 +22,7 @@
   import Profiles from '../views/Profiles.svelte';
   import McpServers from '../views/McpServers.svelte';
   import Backup from '../views/Backup.svelte';
+  import FolderView from '../views/FolderView.svelte';
   import { claudeDir, listDirFull, readFile } from '../lib/fs';
   import { getActiveAdapter } from '../lib/adapters/index';
   import { loadSettings } from '../lib/settings';
@@ -42,12 +42,13 @@
   let profileListVersion = $state(0);
 
   /** Keys that change when a profile is switched — cleared immediately to avoid stale badges */
-  const PROFILE_COUNT_KEYS = ['agents', 'commands', 'hooks', 'plans', 'skills', 'config', 'mcp'];
+  const PROFILE_COUNT_KEYS = ['agents', 'commands', 'hooks', 'plans', 'skills', 'mcp'];
 
   function handleProfileSwitch() {
     const cleared = { ...counts };
     for (const k of PROFILE_COUNT_KEYS) delete cleared[k];
     counts = cleared;
+    viewKey++;
     loadAllCounts();
     profileListVersion++;
   }
@@ -129,6 +130,11 @@
     viewKey++;
   }
 
+  /** Convert dir name to display label: usage-data → Usage Data */
+  function prettifyDirName(name: string): string {
+    return name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
   function handleCountUpdate(view: string, count: number) {
     counts = { ...counts, [view]: count };
   }
@@ -158,21 +164,6 @@
         } catch { return 0; }
       };
 
-      const countConfigFiles = async () => {
-        const adapter = await getActiveAdapter();
-        const files = adapter.id === 'claude'
-          ? ['CLAUDE.md', 'MEMORY.md']
-          : adapter.instructionsFileName ? [adapter.instructionsFileName] : [];
-        let count = 0;
-        for (const file of files) {
-          try {
-            const content = await readFile(`${base}/${file}`);
-            if (content.trim().length > 0) count++;
-          } catch {}
-        }
-        return count;
-      };
-
       const countTodos = async () => {
         try {
           const entries = await listDirFull(`${base}/todos`);
@@ -194,14 +185,13 @@
         } catch { return 0; }
       };
 
-      const [skills, agents, commands, hooks, tasks, plans, config, todos, teams, sessions, profiles, mcpConfig] = await Promise.all([
+      const [skills, agents, commands, hooks, tasks, plans, todos, teams, sessions, profiles, mcpConfig] = await Promise.all([
         countDir('skills', (e) => e.isDir),
         countDir('agents', (e) => !e.isDir && e.name.endsWith('.md')),
         countDir('commands', (e) => !e.isDir && e.name.endsWith('.md')),
         countDir('hooks', (e) => !e.isDir),
         countTaskSessions(),
         countDir('plans', (e) => !e.isDir && e.name.endsWith('.md')),
-        countConfigFiles(),
         countTodos(),
         countTeams(),
         countSessions(),
@@ -223,7 +213,7 @@
         pluginCount = enabledKeys.size;
       } catch {}
 
-      counts = { skills, agents, commands, hooks, plugins: pluginCount, tasks, plans, config, todos, teams, sessions, profiles, mcp: mcpConfig };
+      counts = { skills, agents, commands, hooks, plugins: pluginCount, tasks, plans, todos, teams, sessions, profiles, mcp: mcpConfig };
     } catch (e) {
       console.error('[Counts] Failed to load:', e);
     }
@@ -281,7 +271,9 @@
   <main class="flex-1 min-w-0 overflow-hidden bg-[var(--surface-0)]">
     <!-- View header bar — SwitchHosts-style clean top bar -->
     <div class="h-10 border-b border-[var(--border-default)] flex items-center px-5 bg-[var(--surface-0)]">
-      <h1 class="text-[13px] font-semibold text-[var(--text-primary)] capitalize">{activeView}</h1>
+      <h1 class="text-[13px] font-semibold text-[var(--text-primary)] capitalize">
+        {activeView.startsWith('folder:') ? prettifyDirName(activeView.slice(7)) : activeView}
+      </h1>
       {#if counts[activeView] !== undefined && counts[activeView] > 0}
         <span class="ml-2 text-[10px] font-mono text-[var(--text-ghost)] bg-[var(--surface-2)] px-1.5 py-px rounded">
           {counts[activeView]}
@@ -304,8 +296,6 @@
           <Agents onCount={(n) => handleCountUpdate('agents', n)} {initialSelect} />
         {:else if activeView === 'commands'}
           <Commands onCount={(n) => handleCountUpdate('commands', n)} {initialSelect} />
-        {:else if activeView === 'config'}
-          <Config onCount={(n) => handleCountUpdate('config', n)} />
         {:else if activeView === 'hooks'}
           <Hooks onCount={(n) => handleCountUpdate('hooks', n)} {initialSelect} />
         {:else if activeView === 'plans'}
@@ -330,6 +320,8 @@
           <McpServers onCount={(n) => handleCountUpdate('mcp', n)} />
         {:else if activeView === 'backup'}
           <Backup initialSection={backupSection} />
+        {:else if activeView.startsWith('folder:')}
+          <FolderView dirName={activeView.slice(7)} onCount={(n) => handleCountUpdate(activeView, n)} />
         {/if}
       </div>
     {/key}

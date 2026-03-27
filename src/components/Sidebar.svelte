@@ -1,26 +1,80 @@
 <script lang="ts">
   import { getVersion } from '@tauri-apps/api/app';
+  import { exists } from '@tauri-apps/plugin-fs';
   import { getActiveProfile, listProfiles, loadProfile, switchToDefault, createFromTemplate, type Profile } from '../lib/profiles';
   import { estimateCurrentTokens, formatTokens } from '../lib/tokenEstimator';
   import { getTheme, setTheme, type Theme } from '../lib/theme.svelte';
   import { addToast } from '../lib/toast.svelte';
   import { t } from '../lib/i18n.svelte';
   import { getActiveAdapter, CLI_ADAPTERS } from '../lib/adapters/index';
+  import { claudeDir, listDirFull } from '../lib/fs';
+  import { loadAppConfig, saveAppConfig } from '../lib/app-config';
   import type { CliAdapter, CliId } from '../lib/adapters/types';
+
+  /** All predefined dir IDs that have dedicated views */
+  const ALL_RESOURCE_DIR_IDS = ['agents','commands','hooks','plans','plugins','skills','tasks','teams','todos'];
+  /** Dirs that are internal/runtime — never shown in Resources */
+  const INTERNAL_DIRS = new Set(['profiles', 'sessions', 'cache', 'log', 'temp', 'tmp', '.git', 'node_modules', 'shell_snapshots']);
+
+  /** Convert dir name to display label: usage-data → Usage Data, session_env → Session Env */
+  function prettifyDirName(name: string): string {
+    return name.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
 
   let appVersion = $state('');
   let activeCliAdapter = $state<CliAdapter | null>(null);
   let cliPickerOpen = $state(false);
+  /** Predefined dirs that physically exist. null = not loaded yet. */
+  let existingDirs = $state<Set<string> | null>(null);
+  /** All subdirs discovered in the CLI config dir (predefined + custom). null = not loaded yet. */
+  let discoveredDirs = $state<string[] | null>(null);
+  /** User's explicit visibility config for the active CLI. null = use auto-detection. */
+  let userResourceDirs = $state<string[] | null>(null);
+  /** Draft state for the resource configure panel */
+  let resourceConfigOpen = $state(false);
+  let resourceConfigDraft = $state<string[]>([]);
+
   getVersion().then(v => appVersion = v);
-  getActiveAdapter().then(a => activeCliAdapter = a);
+  getActiveAdapter().then(a => {
+    activeCliAdapter = a;
+    activeProfile = getActiveProfile(a.id);
+    loadDirConfig(a.id);
+  });
+
+  async function loadDirConfig(cliId: string): Promise<void> {
+    // Load user resource dir preferences from app config
+    const config = await loadAppConfig();
+    userResourceDirs = config.resourceDirs?.[cliId] ?? null;
+
+    // Check which predefined dirs exist + discover all subdirs
+    const base = await claudeDir();
+    const predefinedCheck = new Set<string>();
+    await Promise.all(ALL_RESOURCE_DIR_IDS.map(async (dir) => {
+      if (await exists(`${base}/${dir}`)) predefinedCheck.add(dir);
+    }));
+    existingDirs = predefinedCheck;
+
+    // Discover all subdirs (for custom dir display in configure panel)
+    try {
+      const entries = await listDirFull(base);
+      discoveredDirs = entries
+        .filter(e => e.isDir && e.name && !INTERNAL_DIRS.has(e.name))
+        .map(e => e.name);
+    } catch {
+      discoveredDirs = [];
+    }
+  }
 
   async function switchCliFromSidebar(id: CliId): Promise<void> {
     const { setActiveAdapter } = await import('../lib/adapters/index');
     activeCliAdapter = await setActiveAdapter(id);
     cliPickerOpen = false;
-    // Clear active profile — it belongs to the previous CLI's profile dir
-    localStorage.removeItem('sf-active-profile');
-    activeProfile = null;
+    // Restore the profile saved for the new CLI (per-CLI persistence)
+    activeProfile = getActiveProfile(id);
+    existingDirs = null;
+    discoveredDirs = null;
+    userResourceDirs = null;
+    loadDirConfig(id);
     window.dispatchEvent(new CustomEvent('cli-changed', { detail: { id } }));
   }
 
@@ -38,10 +92,11 @@
   import { onMount } from 'svelte';
 
   let profiles = $state<Profile[]>([]);
-  let activeProfile = $state<string | null>(getActiveProfile());
+  let activeProfile = $state<string | null>(null);
   let profilesOpen = $state(false);
   let gearOpen = $state(false);
   let switching = $state(false);
+  let switchingTo = $state<string | null>(null);
   let currentTokens = $state<number | null>(null);
   let minimalModeLoading = $state(false);
   let gearBtnEl = $state<HTMLButtonElement | null>(null);
@@ -59,10 +114,11 @@
   onMount(() => {
     if (menuPortal) document.body.appendChild(menuPortal);
 
-    const onCliChange = async () => {
+    const onCliChange = async (e: Event) => {
+      const id = (e as CustomEvent<{ id: string }>).detail.id;
       activeCliAdapter = await getActiveAdapter();
-      // Active profile belongs to the previous CLI — reset for the new one
-      activeProfile = getActiveProfile();
+      // Restore the per-CLI profile for the newly activated CLI
+      activeProfile = getActiveProfile(id);
       await refreshProfiles();
     };
     window.addEventListener('cli-changed', onCliChange);
@@ -85,7 +141,9 @@
 
   async function refreshProfiles(): Promise<void> {
     profiles = await listProfiles();
-    activeProfile = getActiveProfile();
+    if (activeCliAdapter) {
+      activeProfile = getActiveProfile(activeCliAdapter.id);
+    }
     estimateCurrentTokens().then((est) => { currentTokens = est.total; }).catch(() => {});
   }
 
@@ -109,21 +167,45 @@
     }
   }
 
+  async function switchProfileToDefault(): Promise<void> {
+    switching = true;
+    switchingTo = 'Default';
+    profilesOpen = false;
+    const start = Date.now();
+    try {
+      await switchToDefault();
+      activeProfile = null;
+      addToast('Switched to Default', 'success');
+      onProfileSwitch?.();
+    } catch (e) {
+      addToast(`Failed to switch: ${e}`, 'error');
+    } finally {
+      const elapsed = Date.now() - start;
+      if (elapsed < 600) await new Promise((r) => setTimeout(r, 600 - elapsed));
+      switching = false;
+      switchingTo = null;
+    }
+  }
+
   async function switchProfile(name: string): Promise<void> {
     switching = true;
+    switchingTo = name;
+    profilesOpen = false;
+    const start = Date.now();
     try {
       await loadProfile(name);
       activeProfile = name;
-      profilesOpen = false;
       addToast(`Switched to "${name}"`, 'success');
       onProfileSwitch?.();
     } catch (e) {
       addToast(`Failed to switch: ${e}`, 'error');
     } finally {
+      const elapsed = Date.now() - start;
+      if (elapsed < 600) await new Promise((r) => setTimeout(r, 600 - elapsed));
       switching = false;
+      switchingTo = null;
     }
   }
-
 
   $effect(() => {
     profileListVersion;
@@ -132,30 +214,126 @@
 
   const supported = $derived(activeCliAdapter?.supportedViews ?? null);
 
+  function isResourceVisible(id: string): boolean {
+    // supportedViews controls CLI-level availability
+    if (supported !== null && !supported.includes(id)) return false;
+    // User has explicit config → use it
+    if (userResourceDirs !== null) return userResourceDirs.includes(id);
+    // Auto-detect: hide if dir does not exist (once loaded)
+    if (existingDirs !== null) return existingDirs.has(id);
+    return true; // dirs not loaded yet — show all to avoid flash of empty
+  }
+
   function isViewVisible(id: string): boolean {
-    // Profiles and settings are always shown
     if (id === 'profiles' || id === 'settings') return true;
     return supported === null || supported.includes(id);
   }
 
-  const mainItems = $derived([
-    { id: 'agents',   label: t('nav.agents'),   icon: 'agents',   shortcut: '1' },
-    { id: 'commands', label: t('nav.commands'),  icon: 'commands',  shortcut: '2' },
-    { id: 'hooks',    label: t('nav.hooks'),     icon: 'hooks',     shortcut: '3' },
-    { id: 'plans',    label: t('nav.plans'),     icon: 'plans',     shortcut: '4' },
-    { id: 'plugins',  label: t('nav.plugins'),   icon: 'plugins',   shortcut: '5' },
-    { id: 'skills',   label: t('nav.skills'),    icon: 'skills',    shortcut: '6' },
-    { id: 'tasks',    label: t('nav.tasks'),     icon: 'tasks',     shortcut: '7' },
-    { id: 'teams',    label: t('nav.teams'),     icon: 'teams',     shortcut: '8' },
-    { id: 'todos',    label: t('nav.todos'),     icon: 'todos',     shortcut: '9' },
-  ].filter(item => isViewVisible(item.id)));
+  const mainItems = $derived.by(() => {
+    // Explicit reads to ensure Svelte 5 tracks these dependencies
+    const sup = supported;
+    const uDirs = userResourceDirs;
+    const eDirs = existingDirs;
+
+    const all = [
+      { id: 'agents',   label: t('nav.agents'),   icon: 'agents',   shortcut: '1' },
+      { id: 'commands', label: t('nav.commands'),  icon: 'commands',  shortcut: '2' },
+      { id: 'hooks',    label: t('nav.hooks'),     icon: 'hooks',     shortcut: '3' },
+      { id: 'plans',    label: t('nav.plans'),     icon: 'plans',     shortcut: '4' },
+      { id: 'plugins',  label: t('nav.plugins'),   icon: 'plugins',   shortcut: '5' },
+      { id: 'skills',   label: t('nav.skills'),    icon: 'skills',    shortcut: '6' },
+      { id: 'tasks',    label: t('nav.tasks'),     icon: 'tasks',     shortcut: '7' },
+      { id: 'teams',    label: t('nav.teams'),     icon: 'teams',     shortcut: '8' },
+      { id: 'todos',    label: t('nav.todos'),     icon: 'todos',     shortcut: '9' },
+    ];
+
+    return all.filter(item => {
+      if (sup !== null && !sup.includes(item.id)) return false;
+      if (uDirs !== null) return uDirs.includes(item.id);
+      if (eDirs !== null) return eDirs.has(item.id);
+      return true;
+    });
+  });
 
   const systemItems = $derived([
-    { id: 'config',   label: t('nav.config'),    icon: 'config' },
     { id: 'mcp',      label: t('nav.mcp'),       icon: 'mcp' },
     { id: 'sessions', label: t('nav.sessions'),  icon: 'sessions' },
     { id: 'settings', label: t('nav.settings'),  icon: 'settings' },
   ].filter(item => isViewVisible(item.id)));
+
+  /** Predefined dir IDs supported by the current CLI */
+  const configurablePredefinedIds = $derived(
+    ALL_RESOURCE_DIR_IDS.filter(id => supported === null || supported.includes(id))
+  );
+
+  /** Custom dirs: in userResourceDirs but NOT in predefined list → shown in sidebar nav */
+  const customDirItems = $derived.by(() => {
+    const uDirs = userResourceDirs;
+    return (uDirs ?? []).filter(id => !ALL_RESOURCE_DIR_IDS.includes(id));
+  });
+
+  /**
+   * Custom dirs shown in configure panel's Custom section.
+   * Union of: filesystem-discovered dirs + already-saved user custom dirs + current draft custom items.
+   * Reactive via $derived so it updates when draft changes.
+   */
+  const panelCustomDirs = $derived(
+    [...new Set([
+      ...(discoveredDirs ?? []).filter(d => !ALL_RESOURCE_DIR_IDS.includes(d)),
+      ...(userResourceDirs ?? []).filter(d => !ALL_RESOURCE_DIR_IDS.includes(d)),
+      ...resourceConfigDraft.filter(d => !ALL_RESOURCE_DIR_IDS.includes(d)),
+    ])]
+  );
+
+  function openResourceConfig(): void {
+    // Sync draft from persisted state
+    resourceConfigDraft = userResourceDirs
+      ? [...userResourceDirs]
+      : [...(existingDirs ?? new Set())].filter(id => configurablePredefinedIds.includes(id));
+    resourceConfigOpen = true;
+  }
+
+  /** Persist current draft to disk and update sidebar immediately */
+  async function persistResourceDirs(dirs: string[]): Promise<void> {
+    try {
+      const cliId = activeCliAdapter?.id ?? 'claude';
+      const plain = [...dirs];
+      const config = await loadAppConfig();
+      config.resourceDirs = { ...config.resourceDirs, [cliId]: plain };
+      await saveAppConfig(config);
+      userResourceDirs = plain;
+    } catch (e) {
+      console.error('[Sidebar] persistResourceDirs failed:', e);
+      addToast(`Failed to save: ${e}`, 'error');
+    }
+  }
+
+  async function resetResourceConfig(): Promise<void> {
+    try {
+      const cliId = activeCliAdapter?.id ?? 'claude';
+      const config = await loadAppConfig();
+      if (config.resourceDirs) {
+        delete config.resourceDirs[cliId];
+        if (Object.keys(config.resourceDirs).length === 0) delete config.resourceDirs;
+      }
+      await saveAppConfig(config);
+      userResourceDirs = null;
+      // Re-sync draft to auto-detect state
+      resourceConfigDraft = [...(existingDirs ?? new Set())].filter(id => configurablePredefinedIds.includes(id));
+    } catch (e) {
+      console.error('[Sidebar] resetResourceConfig failed:', e);
+      addToast(`Failed to reset: ${e}`, 'error');
+    }
+  }
+
+  function toggleDraftDir(id: string): void {
+    if (resourceConfigDraft.includes(id)) {
+      resourceConfigDraft = resourceConfigDraft.filter(d => d !== id);
+    } else {
+      resourceConfigDraft = [...resourceConfigDraft, id];
+    }
+    persistResourceDirs(resourceConfigDraft);
+  }
 
   function handleAction(action: GearAction): void {
     gearOpen = false;
@@ -180,31 +358,42 @@
   <!-- Profile Switcher -->
   <div class="px-2.5 pb-2">
     <button
-      onclick={() => { profilesOpen = !profilesOpen; }}
+      onclick={() => { if (!switching) profilesOpen = !profilesOpen; }}
+      disabled={switching}
       class="w-full flex items-center gap-2 px-2.5 py-1.5 rounded border transition-all duration-150 text-left
-             {profilesOpen
+             {switching
+               ? 'bg-[var(--surface-0)] border-[var(--accent-dim)]/40'
+               : profilesOpen
                ? 'bg-[var(--surface-0)] border-[var(--border-accent)] shadow-sm'
                : 'bg-[var(--surface-0)]/60 border-[var(--border-subtle)] hover:bg-[var(--surface-0)] hover:border-[var(--border-default)]'}"
     >
-      <span class="w-1.5 h-1.5 rounded-full shrink-0 {activeProfile ? 'bg-[var(--success)]' : 'bg-[var(--text-ghost)]'}"></span>
-      <span class="flex-1 text-[12px] font-medium truncate text-[var(--text-secondary)]">
-        {activeProfile ?? t('default')}
+      {#if switching}
+        <div class="w-3 h-3 rounded-full border border-transparent border-t-[var(--accent)] animate-spin shrink-0"></div>
+      {:else}
+        <span class="w-1.5 h-1.5 rounded-full shrink-0 {activeProfile ? 'bg-[var(--success)]' : 'bg-[var(--text-ghost)]'}"></span>
+      {/if}
+      <span class="flex-1 text-[12px] font-medium truncate {switching ? 'text-[var(--accent-dim)]' : 'text-[var(--text-secondary)]'}">
+        {switching ? (switchingTo ?? 'Switching...') : (activeProfile ?? t('default'))}
       </span>
-      {#if currentTokens !== null}
+      {#if !switching && currentTokens !== null}
         <span class="text-[9px] font-mono text-[var(--text-ghost)] shrink-0">~{formatTokens(currentTokens)}</span>
       {/if}
-      <svg class="w-3 h-3 text-[var(--text-ghost)] transition-transform duration-150 {profilesOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-      </svg>
+      {#if !switching}
+        <svg class="w-3 h-3 text-[var(--text-ghost)] transition-transform duration-150 {profilesOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      {/if}
     </button>
 
     {#if profilesOpen}
       <div class="mt-1 rounded border border-[var(--border-default)] bg-[var(--surface-0)] overflow-hidden animate-fade-in shadow-lg shadow-black/5">
         <!-- Default entry -->
         <button
-          onclick={async () => { await switchToDefault(); activeProfile = null; profilesOpen = false; addToast('Switched to Default', 'success'); onProfileSwitch?.(); }}
+          onclick={switchProfileToDefault}
+          disabled={switching}
           class="w-full flex items-center gap-2 px-2.5 py-1.5 text-left border-b border-[var(--border-subtle)] transition-colors duration-100
-                 {activeProfile === null ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-2)]'}"
+                 {activeProfile === null ? 'bg-[var(--accent-subtle)] text-[var(--accent)]' : 'text-[var(--text-secondary)] hover:bg-[var(--surface-2)]'}
+                 disabled:opacity-50 disabled:pointer-events-none"
         >
           <span class="w-1.5 h-1.5 rounded-full shrink-0 {activeProfile === null ? 'bg-[var(--success)]' : 'bg-[var(--text-ghost)]'}"></span>
           <span class="flex-1 text-[12px] truncate">{t('default')}</span>
@@ -255,14 +444,99 @@
     {/if}
   </div>
 
-  <!-- Section label -->
-  <div class="px-4 pb-1 pt-2">
+  <!-- Section label + resource config popover anchor -->
+  <div class="px-3 pb-1 pt-2 flex items-center justify-between relative">
     <span class="text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-[0.08em]">{t('nav.resources')}</span>
+    <button
+      onclick={openResourceConfig}
+      title="Configure visible resources"
+      class="w-4 h-4 flex items-center justify-center rounded text-[var(--text-ghost)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-3)] transition-colors duration-100"
+    >
+      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+      </svg>
+    </button>
+
+    {#if resourceConfigOpen}
+      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+      <div class="fixed inset-0 z-[60]" onclick={() => resourceConfigOpen = false}></div>
+      <div class="absolute top-full left-0 w-60 mt-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-0)] shadow-xl shadow-black/15 z-[61] animate-scale-in flex flex-col max-h-[50vh]">
+        <!-- Header -->
+        <div class="px-3 py-2 border-b border-[var(--border-subtle)] flex items-center justify-between shrink-0">
+          <span class="text-[11px] font-semibold text-[var(--text-secondary)]">{t('res.visible')}</span>
+          <button
+            onclick={resetResourceConfig}
+            title="Reset to auto-detect (show only existing dirs)"
+            class="text-[10px] text-[var(--text-ghost)] hover:text-[var(--accent)] transition-colors duration-100"
+          >{t('res.auto')}</button>
+        </div>
+
+        <!-- Scrollable checkbox list -->
+        <div class="overflow-y-auto overscroll-contain min-h-0 py-1">
+          {#if configurablePredefinedIds.length > 0}
+            <div class="px-3 py-1">
+              <span class="text-[9px] text-[var(--text-ghost)] uppercase tracking-wide font-medium">{t('res.builtin')}</span>
+            </div>
+          {/if}
+          {#each configurablePredefinedIds as id}
+            {@const dirExists = existingDirs?.has(id) ?? false}
+            <label class="flex items-center gap-2.5 px-3 py-1 cursor-pointer hover:bg-[var(--surface-2)] transition-colors duration-100">
+              <input
+                type="checkbox"
+                class="w-3.5 h-3.5 accent-[var(--accent)]"
+                checked={resourceConfigDraft.includes(id)}
+                onchange={() => toggleDraftDir(id)}
+              />
+              <span class="flex-1 text-[12px] text-[var(--text-secondary)] capitalize">{id}</span>
+              {#if !dirExists}
+                <span class="text-[9px] text-[var(--text-ghost)]" title="Directory does not exist yet">--</span>
+              {/if}
+            </label>
+          {/each}
+
+          <!-- Custom dirs (discovered + draft-added) -->
+          {#if panelCustomDirs.length > 0}
+            <div class="px-3 py-1 mt-1 border-t border-[var(--border-subtle)]">
+              <span class="text-[9px] text-[var(--text-ghost)] uppercase tracking-wide font-medium">{t('res.custom')}</span>
+            </div>
+            {#each panelCustomDirs as id}
+              <label class="flex items-center gap-2.5 px-3 py-1 cursor-pointer hover:bg-[var(--surface-2)] transition-colors duration-100">
+                <input
+                  type="checkbox"
+                  class="w-3.5 h-3.5 accent-[var(--accent)]"
+                  checked={resourceConfigDraft.includes(id)}
+                  onchange={() => toggleDraftDir(id)}
+                />
+                <span class="flex-1 text-[12px] text-[var(--text-secondary)]">{prettifyDirName(id)}</span>
+              </label>
+            {/each}
+          {/if}
+        </div>
+
+        <!-- All discovered dirs listed above — no manual add needed -->
+      </div>
+    {/if}
   </div>
 
   <nav class="flex flex-col gap-px px-2.5 flex-1 overflow-y-auto stagger-list">
     {#each mainItems as item}
       {@render navItem(item)}
+    {/each}
+
+    <!-- Custom dir items (user-defined folders) -->
+    {#each customDirItems as dirName}
+      <button
+        onclick={() => onSelect(`folder:${dirName}`)}
+        class="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-left transition-all duration-150
+               {active === `folder:${dirName}`
+                 ? 'bg-[var(--accent-subtle)] text-[var(--accent)]'
+                 : 'text-[var(--text-secondary)] hover:bg-[var(--surface-0)] hover:text-[var(--text-primary)]'}"
+      >
+        <svg class="w-3.5 h-3.5 shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+        </svg>
+        <span class="flex-1 text-[12px] truncate">{prettifyDirName(dirName)}</span>
+      </button>
     {/each}
 
     <!-- Divider -->

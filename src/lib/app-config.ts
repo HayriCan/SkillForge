@@ -12,6 +12,12 @@ export type AppConfig = {
   claudeDir?: string;
   /** Active CLI adapter id; defaults to 'claude' when absent */
   activeCli?: CliId;
+  /**
+   * Per-CLI resource directory visibility config.
+   * When set for a CLI, overrides auto-detection (show only existing dirs).
+   * Key: CliId, Value: array of dir names to show in Resources sidebar.
+   */
+  resourceDirs?: Partial<Record<string, string[]>>;
 };
 
 let configCache: AppConfig | null = null;
@@ -30,7 +36,8 @@ export async function loadAppConfig(): Promise<AppConfig> {
     configCache = JSON.parse(raw);
     return configCache!;
   } catch {
-    return {};
+    configCache = {};
+    return configCache;
   }
 }
 

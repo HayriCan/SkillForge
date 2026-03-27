@@ -4,9 +4,9 @@
 
 # Skill Forge
 
-**The missing GUI for Claude Code.**
+**The missing GUI for Claude Code, Codex CLI & Gemini CLI.**
 
-Visually manage your `~/.claude` configuration — agents, skills, MCP servers, profiles, hooks, and more — without ever touching a raw file.
+Visually manage your CLI configuration — agents, skills, MCP servers, profiles, hooks, and any custom folder — without ever touching a raw file.
 
 [![GitHub release](https://img.shields.io/github/v/release/HayriCan/SkillForge?color=blueviolet&label=latest)](https://github.com/HayriCan/SkillForge/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -20,20 +20,22 @@ Visually manage your `~/.claude` configuration — agents, skills, MCP servers, 
 
 ## What is Skill Forge?
 
-Claude Code stores everything in `~/.claude/` — agent definitions, skill prompts, hook scripts, MCP server configs, memory files, settings. It's powerful, but editing raw Markdown and JSON by hand is slow and error-prone.
+Claude Code stores everything in `~/.claude/`, Codex CLI in `~/.codex/`, and Gemini CLI in `~/.gemini/`. Agent definitions, skill prompts, hook scripts, MCP server configs, memory files, settings — it's powerful, but editing raw Markdown and JSON by hand is slow and error-prone.
 
 **Skill Forge** is a native desktop app that puts a clean UI on top of all of it.
 
-- Browse, create, and edit 12 Claude Code resource views through a structured interface
+- **Multi-CLI support** — switch between Claude Code, Codex CLI, and Gemini CLI from the sidebar
+- Browse, create, and edit resources through a structured interface with dedicated views
+- **Dynamic folder browser** — discover and toggle any custom directory, browse files with breadcrumb navigation, edit text files with line numbers, preview HTML
 - Switch between named profiles (work, personal, client) in one click
 - Search across all your agents, skills, and commands with `Ctrl+K`
 - Manage MCP servers without touching `.mcp.json`
+- Edit global instructions (CLAUDE.md, AGENTS.md) directly from Settings with Rich/Raw toggle
 - Back up and restore your config as a portable `.sfbackup` bundle
-- Use a custom Claude directory from the in-app preferences modal
-- Switch the core UI language without editing config files
+- Switch the core UI language without editing config files (9 languages)
 - Catch validation errors before they silently break your workflows
 
-> Stop editing YAML by hand. Start shipping prompts faster.
+> Stop editing files by hand. Start shipping prompts faster.
 
 ---
 
@@ -41,15 +43,16 @@ Claude Code stores everything in `~/.claude/` — agent definitions, skill promp
 
 | | Feature | Description |
 |---|---|---|
-| **12 Views** | Full config coverage | Agents, Skills, Commands, Hooks, Plans, Plugins, Sessions, Tasks, Teams, Todos, Config, and Settings |
-| **Agents & Skills** | Visual editor | Syntax-highlighted Markdown editor with Markdown view plus raw editing mode for skills |
+| **Multi-CLI** | Claude, Codex, Gemini | Switch between CLI adapters from the sidebar — each with its own config dir, profiles, and views |
+| **Dynamic Folders** | Browse any directory | Toggle visibility of any folder in your CLI config dir — full file browser with breadcrumb navigation, resizable split pane, line-numbered editing, and HTML preview |
+| **Resource Views** | Dedicated editors | Agents, Skills, Commands, Hooks, Plans, Plugins, Sessions, Tasks, Teams, Todos — each with Markdown editor and context menus |
 | **MCP Servers** | GUI management | Add, edit, enable/disable servers without touching JSON |
-| **Profiles** | Config snapshots | Save and restore full `.claude` configurations per project or client |
-| **Command Palette** | `Ctrl+K` | Fuzzy-search across all 12 resource types instantly |
+| **Profiles** | Config snapshots | Save and restore per-CLI configurations per project or client |
+| **Settings** | Structured + raw JSON | Guided settings sections, direct JSON editing, and inline global instructions editor (CLAUDE.md / AGENTS.md) with Rich/Raw toggle |
+| **Command Palette** | `Ctrl+K` | Fuzzy-search across all resource types instantly |
 | **Backup & Restore** | Portable bundles | Export selected capability groups to `.sfbackup`, then restore in merge or overwrite mode |
 | **History & Diff** | Change review | See what changed before you overwrite anything |
-| **Settings** | Structured + raw JSON | Switch between guided settings sections and direct JSON editing |
-| **Preferences** | App-level controls | Change theme, language, and custom Claude directory from one modal |
+| **Preferences** | App-level controls | Change theme, language, and custom config directory from one modal |
 | **Language Support** | 9 UI languages | English, Deutsch, Français, Japanese, Korean, Polish, Turkish, Simplified Chinese, Traditional Chinese |
 | **Validation** | Inline errors | Catch invalid names, malformed JSON, and YAML issues as you type |
 | **Syntax Highlighting** | Shiki-powered | Beautiful code blocks inside the Markdown editor |
@@ -93,6 +96,8 @@ You can change the language from `Preferences` inside the app. The localization 
 |  | Raw CLI | Skill Forge |
 |--|--|--|
 | Edit an agent | `vim ~/.claude/agents/x.md` | Visual editor, syntax highlighted |
+| Switch CLIs | Edit different config dirs | One-click CLI switcher in sidebar |
+| Browse custom dirs | `ls ~/.claude/projects/` | Dynamic folder browser with editing |
 | Switch configs | Manual copy/paste | One-click profile switch |
 | MCP server setup | Edit `.mcp.json` by hand | GUI with form validation |
 | Find a file | `ls ~/.claude/agents/` | `Ctrl+K` fuzzy search |
@@ -166,7 +171,7 @@ npm run tauri dev
 
 **Tech stack:** Tauri 2 · Svelte 5 · TypeScript · Tailwind CSS v4 · Shiki
 
-**Recent product additions:** localization, preferences modal, custom Claude directory support, raw JSON settings mode, raw skill editing mode, and improved backup/restore flow.
+**Recent product additions:** multi-CLI adapter support (Claude Code, Codex CLI, Gemini CLI), dynamic folder browser with resizable pane and file editing, configurable resource visibility, global instructions editor with Rich/Raw toggle, per-CLI profiles, HTML preview for web files, and full i18n coverage for new features.
 
 ---
 

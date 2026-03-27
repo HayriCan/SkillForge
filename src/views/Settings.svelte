@@ -12,6 +12,8 @@
   import { t } from '../lib/i18n.svelte';
   import { CLI_ADAPTERS, getActiveAdapter, setActiveAdapter } from '../lib/adapters/index';
   import type { CliAdapter, CliId } from '../lib/adapters/types';
+  import MarkdownEditor from '../components/MarkdownEditor.svelte';
+  import { addToast } from '../lib/toast.svelte';
   type FileTab = { label: string; path: string };
 
   const KNOWN_KEYS = new Set([
@@ -40,6 +42,14 @@
   let rawFileDraft = $state('');
   let rawFileDirty = $state(false);
   let rawFileSaving = $state(false);
+  /** Global instructions file (CLAUDE.md, AGENTS.md, etc.) */
+  let instrPath = $state('');
+  let instrFileName = $state('');
+  let instrContent = $state('');
+  let instrDraft = $state('');
+  let instrRawMode = $state(false);
+  let instrSaving = $state(false);
+  const instrDirty = $derived(instrDraft !== instrContent);
 
   async function load() {
     const home = await homeDir();
@@ -68,6 +78,33 @@
           rawFileDraft = rawFileContent;
         } catch { rawFileContent = ''; rawFileDraft = ''; }
       }
+    }
+    // Load global instructions file
+    instrFileName = activeAdapter.instructionsFileName ?? '';
+    if (instrFileName) {
+      instrPath = `${base}/${instrFileName}`;
+      try {
+        instrContent = await readFile(instrPath);
+        instrDraft = instrContent;
+      } catch { instrContent = ''; instrDraft = ''; }
+    } else {
+      instrPath = '';
+      instrContent = '';
+      instrDraft = '';
+    }
+  }
+
+  async function saveInstructions(): Promise<void> {
+    if (!instrPath || !instrDirty) return;
+    instrSaving = true;
+    try {
+      await writeFile(instrPath, instrDraft);
+      instrContent = instrDraft;
+      addToast(`Saved ${instrFileName}`, 'success');
+    } catch (e) {
+      addToast(`Failed to save: ${e}`, 'error');
+    } finally {
+      instrSaving = false;
     }
   }
 
@@ -177,10 +214,19 @@
     return ['marketplace', ...Object.keys((settings as any).extraKnownMarketplaces ?? {})];
   }
 
+  function handleKeydown(e: KeyboardEvent): void {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      if (instrDirty) saveInstructions();
+    }
+  }
+
   onMount(load);
 </script>
 
-<div class="h-full min-h-0 flex flex-col max-w-4xl mx-auto w-full">
+<svelte:window onkeydown={handleKeydown} />
+
+<div class="h-full min-h-0 flex flex-col max-w-4xl mx-auto w-full overflow-y-auto">
   <!-- Active CLI Selector -->
   <div class="mb-5">
     <div class="flex items-center gap-2.5 mb-2">
@@ -237,6 +283,69 @@
       </button>
     {/if}
   </div>
+
+  <!-- Global Instructions (CLAUDE.md / AGENTS.md) -->
+  {#if instrFileName}
+    <div class="mb-5">
+      <div class="flex items-center gap-2.5 mb-2">
+        <span class="text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-[0.15em]">{t('settings.global_instructions')}</span>
+        <span class="text-[10px] font-mono text-[var(--text-ghost)]">{instrFileName}</span>
+        {#if instrDirty}
+          <span class="text-[9px] px-1.5 py-0.5 rounded bg-[var(--warning)]/10 text-[var(--warning)] font-semibold">{t('editor.unsaved')}</span>
+        {/if}
+        <div class="ml-auto flex items-center gap-2">
+          <div class="flex rounded border border-[var(--border-subtle)] overflow-hidden">
+            <button
+              onclick={() => instrRawMode = false}
+              class="px-2 py-0.5 text-[10px] font-medium transition-colors
+                     {!instrRawMode
+                       ? 'bg-[var(--accent)] text-white'
+                       : 'text-[var(--text-muted)] hover:bg-[var(--surface-2)]'}"
+            >{t('editor.rich')}</button>
+            <button
+              onclick={() => instrRawMode = true}
+              class="px-2 py-0.5 text-[10px] font-medium transition-colors
+                     {instrRawMode
+                       ? 'bg-[var(--accent)] text-white'
+                       : 'text-[var(--text-muted)] hover:bg-[var(--surface-2)]'}"
+            >{t('editor.raw')}</button>
+          </div>
+          <button
+            onclick={saveInstructions}
+            disabled={!instrDirty || instrSaving}
+            class="px-2.5 py-1 text-[11px] font-medium rounded transition-colors
+                   {instrDirty
+                     ? 'bg-[var(--accent)] text-white hover:opacity-90'
+                     : 'bg-[var(--surface-2)] text-[var(--text-ghost)] cursor-default'}"
+          >
+            {instrSaving ? t('editor.saving') : t('save')}
+          </button>
+        </div>
+      </div>
+      <div class="rounded-lg border border-[var(--border-default)] overflow-hidden max-h-[300px] overflow-y-auto">
+        {#if instrRawMode}
+          {@const lineCount = instrDraft.split('\n').length}
+          <div class="flex min-h-[200px] bg-[var(--surface-1)]">
+            <!-- Line numbers -->
+            <div class="shrink-0 py-4 pr-0 pl-2 select-none text-right border-r border-[var(--border-subtle)]" aria-hidden="true">
+              {#each Array(lineCount) as _, i}
+                <div class="text-[12px] font-mono leading-relaxed text-[var(--text-ghost)] px-1.5">{i + 1}</div>
+              {/each}
+            </div>
+            <!-- Editor -->
+            <textarea
+              bind:value={instrDraft}
+              spellcheck="false"
+              class="flex-1 min-h-[200px] resize-none py-4 px-3 text-[12px] font-mono text-[var(--text-secondary)] leading-relaxed bg-transparent outline-none"
+              style="tab-size: 2;"
+            ></textarea>
+          </div>
+        {:else}
+          <MarkdownEditor bind:value={instrDraft} oninput={() => {}} />
+        {/if}
+      </div>
+    </div>
+  {/if}
 
   {#if !activeAdapter.settingsIsJson}
     <!-- Non-JSON settings (e.g. Codex config.toml) — read-only viewer -->

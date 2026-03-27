@@ -1,6 +1,7 @@
 import { readFile, writeFile, listDirFull, ensureDir, deleteFile, claudeDir, findFiles } from './fs';
 import { loadSettings, saveSettings, type Settings } from './settings';
 import { loadMcpConfig, saveMcpConfig } from './mcp';
+import { loadAppConfig } from './app-config';
 
 export type TemplateType = 'coding' | 'writing' | 'research' | 'minimal' | 'ai-setup';
 
@@ -35,8 +36,11 @@ export type TrashedProfile = Profile & {
   trashName: string;
 };
 
-/** Directories snapshotted as part of a profile */
-const SNAPSHOT_DIRS = ['agents', 'commands', 'hooks', 'plans', 'plugins', 'skills', 'tasks', 'teams', 'todos'];
+/** Directories snapshotted as part of a profile.
+ * NOTE: 'plugins' is intentionally excluded — plugin files are managed externally
+ * by the marketplace system and should not be overwritten by profile switches.
+ * enabledPlugins in settings.json is preserved separately during restore. */
+const SNAPSHOT_DIRS = ['agents', 'commands', 'hooks', 'plans', 'skills', 'tasks', 'teams', 'todos'];
 
 /** Root-level files snapshotted as part of a profile */
 const SNAPSHOT_ROOT_FILES = ['CLAUDE.md', 'MEMORY.md'];
@@ -172,21 +176,26 @@ async function snapshotCurrentStateTo(profileDir: string): Promise<void> {
 }
 
 /**
- * Auto-save the current state as the Default snapshot ONCE —
- * called on app launch and before the first named-profile load so Default can restore it.
+ * Auto-save the current state as the Default snapshot.
+ * Without force: only saves once (first launch guard).
+ * With force: always updates — use before profile creation to ensure Default is fresh.
  */
-export async function autoSaveDefault(): Promise<void> {
+export async function autoSaveDefault(force = false): Promise<void> {
   const dir = await profilesDir();
   const defaultDir = `${dir}/${DEFAULT_SNAPSHOT}`;
-  const exists = await listDirFull(defaultDir).catch(() => null);
-  if (exists !== null) return; // already saved
+  if (!force) {
+    const exists = await listDirFull(defaultDir).catch(() => null);
+    if (exists !== null) return; // already saved
+  }
   await snapshotCurrentStateTo(defaultDir);
 }
 
 /**
  * Save the full current Claude config as a named profile snapshot.
+ * Also refreshes the Default snapshot so it stays current.
  */
 export async function saveProfile(name: string, description?: string): Promise<void> {
+  await autoSaveDefault(true);
   const dir = await profilesDir();
   const profileDir = `${dir}/${name}`;
   await snapshotCurrentStateTo(profileDir);
@@ -197,8 +206,10 @@ export async function saveProfile(name: string, description?: string): Promise<v
 /**
  * Create a blank profile that represents a factory-fresh Claude Code installation:
  * default settings, no CLAUDE.md, no MEMORY.md, no MCP servers, empty resource dirs.
+ * Refreshes the Default snapshot first so it stays current.
  */
 export async function createEmptyProfile(name: string, description?: string): Promise<void> {
+  await autoSaveDefault(true);
   const dir = await profilesDir();
   const profileDir = `${dir}/${name}`;
   await ensureDir(profileDir);
@@ -221,12 +232,14 @@ export async function createEmptyProfile(name: string, description?: string): Pr
 /**
  * Create a profile from a predefined template: only snapshots dirs/files defined in the template.
  * Remaining SNAPSHOT_DIRS are created as empty folders to maintain loadProfile compatibility.
+ * Refreshes the Default snapshot first so it stays current.
  */
 export async function createFromTemplate(
   name: string,
   description: string | undefined,
   templateId: TemplateType,
 ): Promise<void> {
+  await autoSaveDefault(true);
   const template = PROFILE_TEMPLATES.find((t) => t.id === templateId);
   if (!template) throw new Error(`Unknown template: ${templateId}`);
 
@@ -285,7 +298,8 @@ export async function loadProfile(name: string): Promise<void> {
   await autoSaveDefault();
 
   // Save current live state before switching away — named profile or Default
-  const currentProfile = getActiveProfile();
+  const { activeCli } = await loadAppConfig();
+  const currentProfile = getActiveProfile(activeCli ?? 'claude');
   const dir = await profilesDir();
   if (currentProfile) {
     await snapshotCurrentStateTo(`${dir}/${currentProfile}`);
@@ -302,6 +316,12 @@ export async function loadProfile(name: string): Promise<void> {
   // from settings to prevent stale profile data from overwriting live MCP config
   // (on macOS, `claude mcp add --scope user` writes to settings.json)
   delete settingsToRestore.mcpServers;
+  // Preserve live enabledPlugins — plugins are managed externally (marketplace system)
+  // and should not be wiped when switching profiles
+  const liveSettings = await loadSettings().catch(() => ({}) as Settings);
+  if (liveSettings.enabledPlugins) {
+    settingsToRestore.enabledPlugins = liveSettings.enabledPlugins;
+  }
   await saveSettings(settingsToRestore);
 
   for (const file of SNAPSHOT_ROOT_FILES) {
@@ -353,7 +373,7 @@ export async function loadProfile(name: string): Promise<void> {
     }
   } catch {}
 
-  localStorage.setItem('sf-active-profile', name);
+  localStorage.setItem(`sf-active-profile-${activeCli ?? 'claude'}`, name);
 }
 
 /**
@@ -375,8 +395,10 @@ export async function deleteProfile(name: string): Promise<void> {
 
   await moveDir(`${dir}/${name}`, `${trash}/${name}-${Date.now()}`);
 
-  if (localStorage.getItem('sf-active-profile') === name) {
-    localStorage.removeItem('sf-active-profile');
+  const { activeCli } = await loadAppConfig();
+  const key = `sf-active-profile-${activeCli ?? 'claude'}`;
+  if (localStorage.getItem(key) === name) {
+    localStorage.removeItem(key);
   }
 }
 
@@ -435,12 +457,12 @@ export async function copyResourcesBetweenProfiles(
   }
 }
 
-export function getActiveProfile(): string | null {
-  return localStorage.getItem('sf-active-profile');
+export function getActiveProfile(cliId = 'claude'): string | null {
+  return localStorage.getItem(`sf-active-profile-${cliId}`);
 }
 
-export function clearActiveProfile(): void {
-  localStorage.removeItem('sf-active-profile');
+export function clearActiveProfile(cliId = 'claude'): void {
+  localStorage.removeItem(`sf-active-profile-${cliId}`);
 }
 
 /**
@@ -450,7 +472,8 @@ export function clearActiveProfile(): void {
  */
 export async function switchToDefault(): Promise<void> {
   // Save current active named profile's live state before switching to default
-  const currentProfile = getActiveProfile();
+  const { activeCli } = await loadAppConfig();
+  const currentProfile = getActiveProfile(activeCli ?? 'claude');
   if (currentProfile) {
     const dir = await profilesDir();
     await snapshotCurrentStateTo(`${dir}/${currentProfile}`);
@@ -466,6 +489,11 @@ export async function switchToDefault(): Promise<void> {
       const settingsRaw = await readFile(`${defaultDir}/settings.json`);
       const settingsToRestore = JSON.parse(settingsRaw) as Settings;
       delete settingsToRestore.mcpServers;
+      // Preserve live enabledPlugins — plugins are managed externally
+      const liveSettings = await loadSettings().catch(() => ({}) as Settings);
+      if (liveSettings.enabledPlugins) {
+        settingsToRestore.enabledPlugins = liveSettings.enabledPlugins;
+      }
       await saveSettings(settingsToRestore);
     } catch {}
     for (const file of SNAPSHOT_ROOT_FILES) {
@@ -484,7 +512,7 @@ export async function switchToDefault(): Promise<void> {
     } catch {}
   }
 
-  localStorage.removeItem('sf-active-profile');
+  localStorage.removeItem(`sf-active-profile-${activeCli ?? 'claude'}`);
 }
 
 export { SNAPSHOT_DIRS };
