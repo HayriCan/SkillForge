@@ -4,11 +4,15 @@ import { homeDir } from '@tauri-apps/api/path';
 import { getActiveAdapter } from './adapters/index';
 
 /**
- * Read a file relative to $HOME/.claude/plugins/ via Rust IPC.
+ * Read a file relative to <configDir>/plugins/ via Rust IPC.
  * Bypasses Tauri FS scope which has issues with deep marketplace paths on WSL.
  */
 async function readPluginFile(relativePath: string): Promise<string> {
-  return invoke<string>('read_plugin_file', { relativePath });
+  const adapter = await getActiveAdapter();
+  return invoke<string>('read_plugin_file', {
+    configDirName: adapter.configDirName,
+    relativePath,
+  });
 }
 
 export type McpServerType = 'stdio' | 'sse' | 'http';

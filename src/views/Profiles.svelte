@@ -50,6 +50,8 @@
   let saving = $state(false);
   let switching = $state(false);
   let switchingTo = $state<string | null>(null);
+  let cliDirName = $state('.claude');
+  let cliInstructionsFile = $state('CLAUDE.md');
   let trashOpen = $state(false);
   let copyFrom = $state('');
   let copyDirSel = $state<Record<string, boolean>>(Object.fromEntries(SNAPSHOT_DIRS.map((d) => [d, true])));
@@ -62,6 +64,8 @@
     const [profilesData, trashData, adapter] = await Promise.all([listProfiles(), listTrash(), getActiveAdapter()]);
     [profiles, trash] = [profilesData, trashData];
     activeProfile = getActiveProfile(adapter.id);
+    cliDirName = adapter.configDirName;
+    cliInstructionsFile = adapter.instructionsFileName ?? 'CLAUDE.md';
     onCount(profiles.length);
     loading = false;
     // Background token fetch for all profiles
@@ -343,7 +347,7 @@
               <span class="text-[13px] truncate {selectedDefault ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}">Default</span>
               <span class="text-[9px] font-mono px-1 py-0.5 rounded bg-[var(--surface-3)] text-[var(--text-ghost)] shrink-0">live</span>
             </div>
-            <span class="text-[10px] text-[var(--text-ghost)] font-mono shrink-0">~/.claude</span>
+            <span class="text-[10px] text-[var(--text-ghost)] font-mono shrink-0">~/{cliDirName}</span>
           </div>
           {#if defaultTokenTotal !== null}
             {@const max = Math.max(defaultTokenTotal, ...profileTokenMap.values(), 1)}
@@ -482,7 +486,7 @@
             {/if}
             <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface-3)] text-[var(--text-ghost)]">live</span>
           </div>
-          <p class="text-[13px] text-[var(--text-muted)]">Current live state of ~/.claude/ — not a snapshot</p>
+          <p class="text-[13px] text-[var(--text-muted)]">Current live state of ~/{cliDirName}/ — not a snapshot</p>
         </div>
       </div>
 
@@ -517,7 +521,7 @@
           </div>
           <div class="px-4 pb-4 grid grid-cols-2 gap-x-6 gap-y-2.5">
             {#each [
-              { label: 'CLAUDE.md', val: defaultTokenEstimate.claudeMd, count: null, color: 'var(--accent)' },
+              { label: cliInstructionsFile, val: defaultTokenEstimate.claudeMd, count: null, color: 'var(--accent)' },
               { label: 'Skills',    val: defaultTokenEstimate.skills,   count: defaultTokenEstimate.skillCount, color: 'var(--success)' },
               { label: 'MEMORY.md', val: defaultTokenEstimate.memoryMd, count: null, color: 'var(--text-ghost)' },
               { label: 'Agents',    val: defaultTokenEstimate.agents,   count: defaultTokenEstimate.agentCount, color: '#60a5fa' },
@@ -653,7 +657,7 @@
           <!-- Breakdown rows -->
           <div class="px-4 pb-4 grid grid-cols-2 gap-x-6 gap-y-2.5">
             {#each [
-              { label: 'CLAUDE.md',   val: tokenEstimate.claudeMd,  count: null,                          color: 'var(--accent)' },
+              { label: cliInstructionsFile,   val: tokenEstimate.claudeMd,  count: null,                          color: 'var(--accent)' },
               { label: 'Skills',      val: tokenEstimate.skills,    count: tokenEstimate.skillCount,      color: 'var(--success)' },
               { label: 'MEMORY.md',   val: tokenEstimate.memoryMd,  count: null,                          color: 'var(--text-ghost)' },
               { label: 'Agents',      val: tokenEstimate.agents,    count: tokenEstimate.agentCount,      color: '#60a5fa' },

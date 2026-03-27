@@ -1,6 +1,7 @@
 import { readFile, writeFile, listDirFull, ensureDir, claudeDir } from './fs';
 import { homeDir } from '@tauri-apps/api/path';
 import { invoke } from '@tauri-apps/api/core';
+import { getActiveAdapter } from './adapters/index';
 
 export type BackupFile = {
   relativePath: string;
@@ -52,8 +53,8 @@ const CATEGORY_DESCRIPTIONS: Record<string, string> = {
   memories: 'Persistent memory files',
   memory: 'Persistent memory files',
   teams: 'Team configurations',
-  __root__: 'settings.json, settings.local.json, CLAUDE.md — includes hooks event mappings and MCP server config',
-  __home__: '~/.claude.json — MCP project-level config',
+  __root__: 'Root-level config files (settings, instructions)',
+  __home__: 'MCP config file (home directory)',
 };
 
 // Only skip ephemeral, cache, or re-installable directories.
@@ -77,7 +78,7 @@ const SKIP_DIRS = new Set([
   'backups',        // avoid recursive backup inclusion
 ]);
 
-// Well-known capability directories — always shown even if currently empty.
+// Well-known capability directories — shown first in the list when they exist on disk.
 const KNOWN_CAPABILITY_DIRS = ['agents', 'commands', 'hooks', 'plugins', 'skills', 'teams'];
 
 /**
@@ -104,7 +105,7 @@ async function countFiles(dir: string, recursive = false): Promise<number> {
 /**
  * Return categories for the export UI.
  * Known capability dirs are always listed (even with 0 files).
- * Root-level config files and ~/.claude.json are also included.
+ * Root-level config files and MCP config (if applicable) are also included.
  * Any other top-level dirs discovered are appended at the end.
  */
 export async function listExportCategories(): Promise<ExportCategory[]> {
@@ -115,25 +116,25 @@ export async function listExportCategories(): Promise<ExportCategory[]> {
   const categories: ExportCategory[] = [];
   const seen = new Set<string>();
 
-  // Collect all files once
-  const allFiles: BackupFile[] = [];
-  await collectFiles(base, base, allFiles);
+  // Fast scan: only list file paths, don't read contents
+  const allPaths: string[] = [];
+  await scanFilePaths(base, base, allPaths);
 
   // Group files by top-level directory
   const filesByCategory = new Map<string, ExportFileInfo[]>();
 
-  for (const f of allFiles) {
-    const sep = f.relativePath.indexOf('/');
-    const segment = sep === -1 ? '__root__' : f.relativePath.slice(0, sep);
-    // Show path relative to category dir (e.g. "my-skill/SKILL.md" instead of just "SKILL.md")
-    const nameInCategory = sep === -1 ? f.relativePath : f.relativePath.slice(sep + 1);
+  for (const rel of allPaths) {
+    const sep = rel.indexOf('/');
+    const segment = sep === -1 ? '__root__' : rel.slice(0, sep);
+    const nameInCategory = sep === -1 ? rel : rel.slice(sep + 1);
     if (!filesByCategory.has(segment)) filesByCategory.set(segment, []);
-    filesByCategory.get(segment)!.push({ name: nameInCategory, relativePath: f.relativePath });
+    filesByCategory.get(segment)!.push({ name: nameInCategory, relativePath: rel });
   }
 
-  // Always-present capability dirs (even if empty)
+  // Known capability dirs — shown first but only if they have files
   for (const id of KNOWN_CAPABILITY_DIRS) {
-    const files = filesByCategory.get(id) ?? [];
+    const files = filesByCategory.get(id);
+    if (!files || files.length === 0) continue;
     categories.push({
       id,
       label: CATEGORY_LABELS[id] ?? id.charAt(0).toUpperCase() + id.slice(1),
@@ -169,23 +170,50 @@ export async function listExportCategories(): Promise<ExportCategory[]> {
     });
   }
 
-  // ~/.claude.json (MCP config)
-  try {
-    await readFile(`${homePath}/.claude.json`);
-    categories.push({
-      id: '__home__',
-      label: CATEGORY_LABELS['__home__'],
-      description: CATEGORY_DESCRIPTIONS['__home__'],
-      fileCount: 1,
-      files: [{ name: '.claude.json', relativePath: '__home__/.claude.json' }],
-    });
-  } catch { /* not present */ }
+  // MCP config file (adapter-aware, e.g. ~/.claude.json or inside config dir)
+  const adapter = await getActiveAdapter();
+  if (adapter.mcpConfigFile && !adapter.mcpConfigFile.includes('/')) {
+    // Top-level MCP config (e.g. .claude.json in home dir)
+    try {
+      await readFile(`${homePath}/${adapter.mcpConfigFile}`);
+      categories.push({
+        id: '__home__',
+        label: CATEGORY_LABELS['__home__'],
+        description: CATEGORY_DESCRIPTIONS['__home__'],
+        fileCount: 1,
+        files: [{ name: adapter.mcpConfigFile, relativePath: `__home__/${adapter.mcpConfigFile}` }],
+      });
+    } catch { /* not present */ }
+  }
 
   return categories;
 }
 
 /**
- * Recursively collect text files from a directory into flat list.
+ * Recursively scan file paths without reading contents (fast, for UI listing).
+ */
+async function scanFilePaths(dir: string, base: string, paths: string[]): Promise<void> {
+  let entries: { name: string; isDir: boolean }[];
+  try {
+    entries = await listDirFull(dir);
+  } catch {
+    return;
+  }
+  for (const e of entries) {
+    if (!e.name) continue;
+    const fullPath = `${dir}/${e.name}`;
+    const rel = fullPath.slice(base.length + 1);
+    if (e.isDir) {
+      if (SKIP_DIRS.has(e.name)) continue;
+      await scanFilePaths(fullPath, base, paths);
+    } else {
+      paths.push(rel);
+    }
+  }
+}
+
+/**
+ * Recursively collect text files from a directory into flat list (reads content).
  */
 async function collectFiles(dir: string, base: string, files: BackupFile[]): Promise<void> {
   let entries: { name: string; isDir: boolean }[];
@@ -251,12 +279,16 @@ export async function exportBackup(
     }
   }
 
-  // ~/.claude.json
-  if (all || catSet.has('__home__') || fileSet.has('__home__/.claude.json')) {
-    try {
-      const claudeJson = await readFile(`${homePath}/.claude.json`);
-      files.push({ relativePath: '__home__/.claude.json', content: claudeJson });
-    } catch {}
+  // MCP config file (adapter-aware)
+  const adapter = await getActiveAdapter();
+  if (adapter.mcpConfigFile && !adapter.mcpConfigFile.includes('/')) {
+    const mcpRelPath = `__home__/${adapter.mcpConfigFile}`;
+    if (all || catSet.has('__home__') || fileSet.has(mcpRelPath)) {
+      try {
+        const mcpJson = await readFile(`${homePath}/${adapter.mcpConfigFile}`);
+        files.push({ relativePath: mcpRelPath, content: mcpJson });
+      } catch {}
+    }
   }
 
   const bundle: BackupBundle = {
@@ -336,12 +368,18 @@ export async function importBackup(
 }
 
 /**
- * Create a full tar.gz backup of the entire ~/.claude/ directory and ~/.claude.json.
+ * Create a full tar.gz backup of the active CLI's config directory.
  * Uses a Rust IPC command that calls system `tar`.
  * Returns { path, sizeBytes } on success.
  */
 export async function createFullBackup(): Promise<{ path: string; sizeBytes: number }> {
-  const result = await invoke<string>('create_full_backup');
+  const adapter = await getActiveAdapter();
+  const result = await invoke<string>('create_full_backup', {
+    configDirName: adapter.configDirName,
+    mcpConfigFile: adapter.mcpConfigFile && !adapter.mcpConfigFile.includes('/')
+      ? adapter.mcpConfigFile
+      : null,
+  });
   const [path, sizeStr] = result.split('|');
   return { path, sizeBytes: parseInt(sizeStr, 10) || 0 };
 }

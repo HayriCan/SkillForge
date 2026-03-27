@@ -623,6 +623,14 @@
     <span class="text-[10px] text-[var(--text-ghost)] font-mono">v{appVersion || '...'}</span>
     <div class="flex items-center gap-0.5">
       <button
+        onclick={() => location.reload()}
+        class="w-7 h-7 flex items-center justify-center rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-3)] transition-all duration-150"
+        title="Reload"
+        aria-label="Reload app"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5"/><path stroke-linecap="round" d="M20.49 9A9 9 0 0 0 5.64 5.64L4 7m16 10l-1.64 1.36A9 9 0 0 1 3.51 15"/></svg>
+      </button>
+      <button
         onclick={cycleTheme}
         class="h-7 px-2 flex items-center gap-1 rounded text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-3)] transition-all duration-150"
         title="Theme: {getTheme()}"

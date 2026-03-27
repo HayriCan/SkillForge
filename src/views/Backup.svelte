@@ -4,6 +4,14 @@
   import { exportBackup, importBackup, listExportCategories, createFullBackup, type ExportCategory } from '../lib/backup';
   import { autoSaveDefault } from '../lib/profiles';
   import { addToast } from '../lib/toast.svelte';
+  import { getActiveAdapter } from '../lib/adapters/index';
+
+  let configDirName = $state('');
+
+  onMount(async () => {
+    const adapter = await getActiveAdapter();
+    configDirName = adapter.configDirName;
+  });
 
   let { initialSection = '' } = $props<{ initialSection?: string }>();
   let exportSectionEl = $state<HTMLElement | null>(null);
@@ -72,7 +80,7 @@
       selectedFiles = new Set();
       scanned = true;
     } catch {
-      addToast('Failed to scan .claude directory', 'error');
+      addToast(`Failed to scan ${configDirName} directory`, 'error');
     } finally {
       categoriesLoading = false;
     }
@@ -165,6 +173,8 @@
   async function doFullBackup() {
     fullBackupRunning = true;
     fullBackupResult = null;
+    // Ensure the loading state renders before the blocking IPC call
+    await tick();
     try {
       const { path, sizeBytes } = await createFullBackup();
       fullBackupResult = { path, size: formatSize(sizeBytes) };
@@ -282,7 +292,7 @@
   <div class="mb-5">
     <h2 class="text-[15px] font-semibold text-[var(--text-primary)] mb-1">Backup & Restore</h2>
     <p class="text-[11px] text-[var(--text-ghost)]">
-      Export your <code class="font-mono text-[var(--accent-dim)]">.claude</code> config as a portable bundle, or restore from a previous backup.
+      Export your <code class="font-mono text-[var(--accent-dim)]">{configDirName || '.claude'}</code> config as a portable bundle, or restore from a previous backup.
     </p>
   </div>
 
@@ -297,8 +307,7 @@
           <h3 class="text-[13px] font-semibold text-[var(--text-primary)]">Full Backup</h3>
           <p class="text-[10px] text-[var(--text-ghost)] mt-0.5">
             Creates a <code class="font-mono text-[var(--accent-dim)]">.tar.gz</code> of the entire
-            <code class="font-mono text-[var(--accent-dim)]">~/.claude/</code> directory and
-            <code class="font-mono text-[var(--accent-dim)]">~/.claude.json</code>
+            <code class="font-mono text-[var(--accent-dim)]">~/{configDirName || '.claude'}/</code> directory
           </p>
         </div>
       </div>
@@ -393,10 +402,10 @@
         </div>
       {:else if categoriesLoading}
         <div class="flex items-center gap-2 py-3">
-          <span class="text-[11px] text-[var(--text-ghost)] animate-pulse">Scanning .claude directory…</span>
+          <span class="text-[11px] text-[var(--text-ghost)] animate-pulse">Scanning {configDirName || 'config'} directory…</span>
         </div>
       {:else if categories.length === 0}
-        <p class="text-[11px] text-[var(--text-ghost)] py-3">No exportable content found in .claude directory.</p>
+        <p class="text-[11px] text-[var(--text-ghost)] py-3">No exportable content found in {configDirName || 'config'} directory.</p>
       {:else}
         <!-- Transferable Capabilities -->
         <div class="flex items-center justify-between mb-1">
