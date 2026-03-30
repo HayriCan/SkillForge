@@ -1,0 +1,11 @@
+{
+  "version": "1",
+  "createdAt": "2026-03-24T10:00:00.000Z",
+  "claudeDir": "/home/testuser/.claude",
+  "files": [
+    { "relativePath": "settings.json", "content": "{\"theme\":\"dark\"}" },
+    { "relativePath": "CLAUDE.md", "content": "# Global Rules\n\nTest content." },
+    { "relativePath": "agents/myagent.md", "content": "---\nname: myagent\n---\nAgent content." },
+    { "relativePath": "__home__/.claude.json", "content": "{\"projects\":{}}" }
+  ]
+}

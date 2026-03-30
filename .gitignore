@@ -1,0 +1,10 @@
+node_modules/
+build/
+.svelte-kit/
+src-tauri/target/
+dist/
+.DS_Store
+*.log
+# Claude Code config (keep commands/)
+.claude/*
+!.claude/commands/
