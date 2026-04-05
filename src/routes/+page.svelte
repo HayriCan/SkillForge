@@ -8,21 +8,18 @@
   import CommandPalette from '../components/CommandPalette.svelte';
   import Onboarding from '../components/Onboarding.svelte';
   import { registerShortcuts, isMac, increaseFontSize, decreaseFontSize, setFontSize, getFontSize } from '../lib/shortcuts';
-  import Agents from '../views/Agents.svelte';
-  import Commands from '../views/Commands.svelte';
-  import Hooks from '../views/Hooks.svelte';
-  import Plans from '../views/Plans.svelte';
   import Plugins from '../views/Plugins.svelte';
   import Sessions from '../views/Sessions.svelte';
   import Settings from '../views/Settings.svelte';
-  import Skills from '../views/Skills.svelte';
+  import Insights from '../views/Insights.svelte';
+  import UnifiedResourceView from '../components/UnifiedResourceView.svelte';
+  import { resourceConfigs } from '../lib/resource-config';
   import Tasks from '../views/Tasks.svelte';
   import Teams from '../views/Teams.svelte';
   import Todos from '../views/Todos.svelte';
   import Profiles from '../views/Profiles.svelte';
   import McpServers from '../views/McpServers.svelte';
   import Backup from '../views/Backup.svelte';
-  import FolderView from '../views/FolderView.svelte';
   import { claudeDir, listDirFull, readFile } from '../lib/fs';
   import { getActiveAdapter, detectInstalledClis } from '../lib/adapters/index';
   import type { CliAdapter } from '../lib/adapters/types';
@@ -321,22 +318,18 @@
     <!-- View content -->
     {#key viewKey}
       <div class="h-[calc(100vh-2.5rem)] overflow-hidden px-5 py-4 animate-fade-in">
-        {#if activeView === 'agents'}
-          <Agents onCount={(n) => handleCountUpdate('agents', n)} {initialSelect} />
-        {:else if activeView === 'commands'}
-          <Commands onCount={(n) => handleCountUpdate('commands', n)} {initialSelect} />
-        {:else if activeView === 'hooks'}
-          <Hooks onCount={(n) => handleCountUpdate('hooks', n)} {initialSelect} />
-        {:else if activeView === 'plans'}
-          <Plans onCount={(n) => handleCountUpdate('plans', n)} {initialSelect} />
+        {#if resourceConfigs[activeView]}
+          <UnifiedResourceView config={resourceConfigs[activeView]} activeCli={prefActiveAdapter?.id} onCount={(n) => handleCountUpdate(activeView, n)} {initialSelect} />
+        {:else if activeView.startsWith('folder:')}
+          <UnifiedResourceView dirName={activeView.slice(7)} activeCli={prefActiveAdapter?.id} onCount={(n) => handleCountUpdate(activeView, n)} />
         {:else if activeView === 'plugins'}
           <Plugins onCount={(n) => handleCountUpdate('plugins', n)} />
+        {:else if activeView === 'insights'}
+          <Insights onCount={(n) => handleCountUpdate('insights', n)} />
         {:else if activeView === 'sessions'}
           <Sessions onCount={(n) => handleCountUpdate('sessions', n)} />
         {:else if activeView === 'settings'}
           <Settings />
-        {:else if activeView === 'skills'}
-          <Skills onCount={(n) => handleCountUpdate('skills', n)} {initialSelect} />
         {:else if activeView === 'tasks'}
           <Tasks onCount={(n) => handleCountUpdate('tasks', n)} />
         {:else if activeView === 'teams'}
@@ -349,8 +342,6 @@
           <McpServers onCount={(n) => handleCountUpdate('mcp', n)} />
         {:else if activeView === 'backup'}
           <Backup initialSection={backupSection} />
-        {:else if activeView.startsWith('folder:')}
-          <FolderView dirName={activeView.slice(7)} onCount={(n) => handleCountUpdate(activeView, n)} />
         {/if}
       </div>
     {/key}

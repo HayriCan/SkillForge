@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { claudeDir, listDirFull, readFile, getCreatedAt, deleteFile } from '../lib/fs';
+  import { addToast } from '../lib/toast.svelte';
   import ContextMenu from '../components/ContextMenu.svelte';
   import ConfirmModal from '../components/ConfirmModal.svelte';
   import MarkdownEditor from '../components/MarkdownEditor.svelte';
@@ -65,7 +66,9 @@
             try { meta = JSON.parse(content); } catch {}
           }
           result.push({ name: e.name, path, content, createdAt, isJson, meta });
-        } catch {}
+        } catch (e) {
+          addToast(`Failed to read session: ${e}`, 'error');
+        }
       }
 
       result.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
@@ -73,6 +76,7 @@
       onCount(result.length);
     } catch (e) {
       console.error('[Sessions] Load failed:', e);
+      addToast(`Failed to load sessions: ${e}`, 'error');
     }
   }
 

@@ -15,6 +15,7 @@
   import MarkdownEditor from '../components/MarkdownEditor.svelte';
   import { addToast } from '../lib/toast.svelte';
   type FileTab = { label: string; path: string };
+  type MainTab = 'config' | 'global' | 'local';
 
   const KNOWN_KEYS = new Set([
     'env', 'permissions', 'hooks',
@@ -26,6 +27,7 @@
 
   let tabs = $state<FileTab[]>([]);
   let activeTab = $state(0);
+  let mainTab = $state<MainTab>('global');
   let settings = $state<Settings>({});
   let search = $state('');
   let basePath = $state('');
@@ -152,6 +154,12 @@
     }
   }
 
+  async function switchMainTab(tab: MainTab) {
+    mainTab = tab;
+    if (tab === 'global' && tabs.length > 0) await loadTab(0);
+    else if (tab === 'local' && tabs.length > 1) await loadTab(1);
+  }
+
   async function saveRawJson() {
     try {
       const parsed = JSON.parse(rawJson);
@@ -222,157 +230,175 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="h-full min-h-0 flex flex-col max-w-4xl mx-auto w-full overflow-y-auto">
-  <!-- CLI info (switching happens in sidebar) -->
 
-  <!-- Config Directory -->
-  <div class="mb-5">
-    <div class="flex items-center gap-2.5 mb-2">
-      <span class="text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-[0.15em]">Config Directory</span>
-      {#if claudePath !== defaultPath}
-        <span class="text-[9px] text-[var(--warning)] bg-[var(--warning)]/10 px-1.5 py-0.5 rounded-md font-semibold">custom</span>
-      {/if}
-    </div>
-    {#if pathEditing}
-      <div class="flex gap-2 animate-fade-in">
-        <input
-          bind:value={pathDraft}
-          placeholder={defaultPath}
-          class="flex-1 bg-[var(--surface-2)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-[13px] text-[var(--text-primary)] font-mono outline-none focus:border-[var(--accent-dim)] transition-colors"
-          onkeydown={(e) => { if (e.key === 'Enter') savePath(); if (e.key === 'Escape') pathEditing = false; }}
-        />
-        <button onclick={savePath} class="px-3 py-2 bg-[var(--accent-dim)] hover:bg-[var(--accent)] rounded-lg text-[11px] text-[var(--surface-0)] font-semibold transition-colors">Save</button>
-        <button onclick={() => pathEditing = false} class="px-3 py-2 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">Cancel</button>
-      </div>
-      <div class="text-[10px] text-[var(--text-ghost)] mt-1.5">Default: <span class="font-mono">{defaultPath}</span> &middot; Leave empty to reset</div>
-    {:else}
-      <button
-        onclick={() => { pathDraft = claudePath; pathEditing = true; }}
-        class="text-[13px] font-mono text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors truncate block max-w-full text-left group"
-      >
-        <span class="group-hover:border-b group-hover:border-[var(--border-default)] transition-all">{claudePath}</span>
-      </button>
-    {/if}
-  </div>
-
-  <!-- Global Instructions (CLAUDE.md / AGENTS.md) -->
-  {#if instrFileName}
-    <div class="mb-5">
-      <div class="flex items-center gap-2.5 mb-2">
-        <span class="text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-[0.15em]">{t('settings.global_instructions')}</span>
-        <span class="text-[10px] font-mono text-[var(--text-ghost)]">{instrFileName}</span>
-        {#if instrDirty}
-          <span class="text-[9px] px-1.5 py-0.5 rounded bg-[var(--warning)]/10 text-[var(--warning)] font-semibold">{t('editor.unsaved')}</span>
-        {/if}
-        <div class="ml-auto flex items-center gap-2">
-          <div class="flex rounded border border-[var(--border-subtle)] overflow-hidden">
-            <button
-              onclick={() => instrRawMode = false}
-              class="px-2 py-0.5 text-[10px] font-medium transition-colors
-                     {!instrRawMode
-                       ? 'bg-[var(--accent)] text-white'
-                       : 'text-[var(--text-muted)] hover:bg-[var(--surface-2)]'}"
-            >{t('editor.rich')}</button>
-            <button
-              onclick={() => instrRawMode = true}
-              class="px-2 py-0.5 text-[10px] font-medium transition-colors
-                     {instrRawMode
-                       ? 'bg-[var(--accent)] text-white'
-                       : 'text-[var(--text-muted)] hover:bg-[var(--surface-2)]'}"
-            >{t('editor.raw')}</button>
-          </div>
-          <button
-            onclick={saveInstructions}
-            disabled={!instrDirty || instrSaving}
-            class="px-2.5 py-1 text-[11px] font-medium rounded transition-colors
-                   {instrDirty
-                     ? 'bg-[var(--accent)] text-white hover:opacity-90'
-                     : 'bg-[var(--surface-2)] text-[var(--text-ghost)] cursor-default'}"
-          >
-            {instrSaving ? t('editor.saving') : t('save')}
-          </button>
-        </div>
-      </div>
-      <div class="rounded-lg border border-[var(--border-default)] overflow-hidden max-h-[300px] overflow-y-auto">
-        {#if instrRawMode}
-          {@const lineCount = instrDraft.split('\n').length}
-          <div class="flex min-h-[200px] bg-[var(--surface-1)]">
-            <!-- Line numbers -->
-            <div class="shrink-0 py-4 pr-0 pl-2 select-none text-right border-r border-[var(--border-subtle)]" aria-hidden="true">
-              {#each Array(lineCount) as _, i}
-                <div class="text-[12px] font-mono leading-relaxed text-[var(--text-ghost)] px-1.5">{i + 1}</div>
-              {/each}
-            </div>
-            <!-- Editor -->
-            <textarea
-              bind:value={instrDraft}
-              spellcheck="false"
-              class="flex-1 min-h-[200px] resize-none py-4 px-3 text-[12px] font-mono text-[var(--text-secondary)] leading-relaxed bg-transparent outline-none"
-              style="tab-size: 2;"
-            ></textarea>
-          </div>
-        {:else}
-          <MarkdownEditor bind:value={instrDraft} oninput={() => {}} />
-        {/if}
-      </div>
-    </div>
-  {/if}
-
-  {#if !activeAdapter.settingsIsJson}
-    <!-- Non-JSON settings (e.g. Codex config.toml) — read-only viewer -->
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-2">
-        <span class="text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-[0.15em]">
-          {activeAdapter.settingsFileName ?? 'Config'}
-        </span>
-        {#if rawFileDirty}
-          <span class="text-[9px] px-1.5 py-0.5 rounded bg-[var(--warning)]/10 text-[var(--warning)] font-semibold">unsaved</span>
-        {/if}
-      </div>
-      <div class="flex items-center gap-2">
-        <span class="text-[10px] text-[var(--text-ghost)] font-mono">{activeAdapter.configDirName}/{activeAdapter.settingsFileName}</span>
-        {#if rawFileDirty}
-          <button
-            onclick={saveRawFile}
-            disabled={rawFileSaving}
-            class="px-2.5 py-1 bg-[var(--accent-dim)] hover:bg-[var(--accent)] rounded text-[11px] text-[var(--surface-0)] font-semibold transition-colors disabled:opacity-50"
-          >{rawFileSaving ? 'Saving…' : 'Save'}</button>
-          <button
-            onclick={() => { rawFileDraft = rawFileContent; rawFileDirty = false; }}
-            class="px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
-          >Discard</button>
-        {/if}
-      </div>
-    </div>
-    {#if rawFileContent !== undefined}
-      <textarea
-        bind:value={rawFileDraft}
-        oninput={() => rawFileDirty = rawFileDraft !== rawFileContent}
-        spellcheck={false}
-        class="flex-1 w-full resize-none text-[12px] font-mono text-[var(--text-secondary)] bg-[var(--surface-2)] border border-[var(--border-subtle)] rounded-lg p-4 leading-relaxed outline-none focus:border-[var(--accent-dim)] transition-colors min-h-[300px]"
-      ></textarea>
-    {:else}
-      <div class="flex items-center justify-center py-12 text-[13px] text-[var(--text-ghost)]">
-        {activeAdapter.settingsFileName} not found
-      </div>
-    {/if}
-  {:else}
-    <!-- Tab bar -->
-    <div class="flex gap-0 border-b border-[var(--border-subtle)] mb-5">
+  <!-- Main tab bar -->
+  <div class="flex gap-0 border-b border-[var(--border-subtle)] mb-5 shrink-0">
+    {#if activeAdapter.settingsIsJson}
       {#each tabs as tab, i}
         <button
-          onclick={() => loadTab(i)}
+          onclick={() => switchMainTab(i === 0 ? 'global' : 'local')}
           class="px-5 py-2.5 text-[13px] transition-all duration-200 border-b-2 -mb-px relative
-                 {activeTab === i ? 'text-[var(--text-primary)] border-[var(--accent)]' : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)]'}"
+                 {mainTab === (i === 0 ? 'global' : 'local') ? 'text-[var(--text-primary)] border-[var(--accent)]' : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)]'}"
         >
           {tab.label}
         </button>
       {/each}
+    {:else if activeAdapter.settingsFileName}
+      <button
+        onclick={() => switchMainTab('global')}
+        class="px-5 py-2.5 text-[13px] transition-all duration-200 border-b-2 -mb-px relative flex items-center gap-2
+               {mainTab === 'global' ? 'text-[var(--text-primary)] border-[var(--accent)]' : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)]'}"
+      >
+        {activeAdapter.settingsFileName ?? 'Config'}
+        {#if rawFileDirty}
+          <span class="text-[9px] px-1.5 py-0.5 rounded bg-[var(--warning)]/10 text-[var(--warning)] font-semibold">unsaved</span>
+        {/if}
+      </button>
+    {/if}
+    <button
+      onclick={() => switchMainTab('config')}
+      class="px-5 py-2.5 text-[13px] transition-all duration-200 border-b-2 -mb-px relative flex items-center gap-2
+             {mainTab === 'config' ? 'text-[var(--text-primary)] border-[var(--accent)]' : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)]'}"
+    >
+      Config Directory
+      {#if claudePath !== defaultPath}
+        <span class="text-[9px] text-[var(--warning)] bg-[var(--warning)]/10 px-1.5 py-0.5 rounded-md font-semibold">custom</span>
+      {/if}
+    </button>
+  </div>
+
+  <!-- Config Directory tab content -->
+  {#if mainTab === 'config'}
+    <div class="animate-fade-in flex-1 flex flex-col min-h-0">
+      <!-- Config path -->
+      <div class="mb-5 shrink-0">
+        <div class="flex items-center gap-2.5 mb-2">
+          <span class="text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-[0.15em]">Config Directory</span>
+        </div>
+        {#if pathEditing}
+          <div class="flex gap-2 animate-fade-in">
+            <input
+              bind:value={pathDraft}
+              placeholder={defaultPath}
+              class="flex-1 bg-[var(--surface-2)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-[13px] text-[var(--text-primary)] font-mono outline-none focus:border-[var(--accent-dim)] transition-colors"
+              onkeydown={(e) => { if (e.key === 'Enter') savePath(); if (e.key === 'Escape') pathEditing = false; }}
+            />
+            <button onclick={savePath} class="px-3 py-2 bg-[var(--accent-dim)] hover:bg-[var(--accent)] rounded-lg text-[11px] text-[var(--surface-0)] font-semibold transition-colors">Save</button>
+            <button onclick={() => pathEditing = false} class="px-3 py-2 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">Cancel</button>
+          </div>
+          <div class="text-[10px] text-[var(--text-ghost)] mt-1.5">Default: <span class="font-mono">{defaultPath}</span> &middot; Leave empty to reset</div>
+        {:else}
+          <button
+            onclick={() => { pathDraft = claudePath; pathEditing = true; }}
+            class="text-[13px] font-mono text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors truncate block max-w-full text-left group"
+          >
+            <span class="group-hover:border-b group-hover:border-[var(--border-default)] transition-all">{claudePath}</span>
+          </button>
+        {/if}
+      </div>
+
+      <!-- Global Instructions (CLAUDE.md / AGENTS.md) -->
+      {#if instrFileName}
+        <div class="flex-1 flex flex-col min-h-0">
+          <div class="flex items-center gap-2.5 mb-2 shrink-0">
+            <span class="text-[10px] font-semibold text-[var(--text-ghost)] uppercase tracking-[0.15em]">{t('settings.global_instructions')}</span>
+            <span class="text-[10px] font-mono text-[var(--text-ghost)]">{instrFileName}</span>
+            {#if instrDirty}
+              <span class="text-[9px] px-1.5 py-0.5 rounded bg-[var(--warning)]/10 text-[var(--warning)] font-semibold">{t('editor.unsaved')}</span>
+            {/if}
+            <div class="ml-auto flex items-center gap-2">
+              <div class="flex rounded border border-[var(--border-subtle)] overflow-hidden">
+                <button
+                  onclick={() => instrRawMode = false}
+                  class="px-2 py-0.5 text-[10px] font-medium transition-colors
+                         {!instrRawMode
+                           ? 'bg-[var(--accent)] text-white'
+                           : 'text-[var(--text-muted)] hover:bg-[var(--surface-2)]'}"
+                >{t('editor.rich')}</button>
+                <button
+                  onclick={() => instrRawMode = true}
+                  class="px-2 py-0.5 text-[10px] font-medium transition-colors
+                         {instrRawMode
+                           ? 'bg-[var(--accent)] text-white'
+                           : 'text-[var(--text-muted)] hover:bg-[var(--surface-2)]'}"
+                >{t('editor.raw')}</button>
+              </div>
+              <button
+                onclick={saveInstructions}
+                disabled={!instrDirty || instrSaving}
+                class="px-2.5 py-1 text-[11px] font-medium rounded transition-colors
+                       {instrDirty
+                         ? 'bg-[var(--accent)] text-white hover:opacity-90'
+                         : 'bg-[var(--surface-2)] text-[var(--text-ghost)] cursor-default'}"
+              >
+                {instrSaving ? t('editor.saving') : t('save')}
+              </button>
+            </div>
+          </div>
+          <div class="rounded-lg border border-[var(--border-default)] overflow-hidden flex-1 min-h-[200px] overflow-y-auto">
+            {#if instrRawMode}
+              {@const lineCount = instrDraft.split('\n').length}
+              <div class="flex h-full bg-[var(--surface-1)]">
+                <div class="shrink-0 py-4 pr-0 pl-2 select-none text-right border-r border-[var(--border-subtle)]" aria-hidden="true">
+                  {#each Array(lineCount) as _, i}
+                    <div class="text-[12px] font-mono leading-relaxed text-[var(--text-ghost)] px-1.5">{i + 1}</div>
+                  {/each}
+                </div>
+                <textarea
+                  bind:value={instrDraft}
+                  spellcheck="false"
+                  class="flex-1 h-full resize-none py-4 px-3 text-[12px] font-mono text-[var(--text-secondary)] leading-relaxed bg-transparent outline-none"
+                  style="tab-size: 2;"
+                ></textarea>
+              </div>
+            {:else}
+              <MarkdownEditor bind:value={instrDraft} oninput={() => {}} />
+            {/if}
+          </div>
+        </div>
+      {/if}
     </div>
   {/if}
 
-  {#if activeAdapter.settingsIsJson}
+  <!-- Non-JSON settings tab content (e.g. Codex config.toml) -->
+  {#if mainTab === 'global' && !activeAdapter.settingsIsJson}
+    <div class="animate-fade-in">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] text-[var(--text-ghost)] font-mono">{activeAdapter.configDirName}/{activeAdapter.settingsFileName}</span>
+        </div>
+        <div class="flex items-center gap-2">
+          {#if rawFileDirty}
+            <button
+              onclick={saveRawFile}
+              disabled={rawFileSaving}
+              class="px-2.5 py-1 bg-[var(--accent-dim)] hover:bg-[var(--accent)] rounded text-[11px] text-[var(--surface-0)] font-semibold transition-colors disabled:opacity-50"
+            >{rawFileSaving ? 'Saving…' : 'Save'}</button>
+            <button
+              onclick={() => { rawFileDraft = rawFileContent; rawFileDirty = false; }}
+              class="px-2 py-1 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+            >Discard</button>
+          {/if}
+        </div>
+      </div>
+      {#if rawFileContent !== undefined}
+        <textarea
+          bind:value={rawFileDraft}
+          oninput={() => rawFileDirty = rawFileDraft !== rawFileContent}
+          spellcheck={false}
+          class="flex-1 w-full resize-none text-[12px] font-mono text-[var(--text-secondary)] bg-[var(--surface-2)] border border-[var(--border-subtle)] rounded-lg p-4 leading-relaxed outline-none focus:border-[var(--accent-dim)] transition-colors min-h-[300px]"
+        ></textarea>
+      {:else}
+        <div class="flex items-center justify-center py-12 text-[13px] text-[var(--text-ghost)]">
+          {activeAdapter.settingsFileName} not found
+        </div>
+      {/if}
+    </div>
+  {/if}
+
+  {#if activeAdapter.settingsIsJson && (mainTab === 'global' || mainTab === 'local')}
   <!-- View mode toggle -->
-  <div class="flex items-center gap-3 mb-5">
+  <div class="flex items-center gap-3 mb-5 animate-fade-in">
     <div class="relative flex-1">
       <input
         bind:value={search}

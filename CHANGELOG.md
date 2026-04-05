@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-04-06
+
+### Added
+- **Unified Resource View** — single configuration-driven component replaces 7 separate views (Agents, Commands, Plans, Skills, Hooks, FolderView, MarkdownCrud); supports markdown/HTML/code/binary rendering, version history, bulk delete, breadcrumb navigation, and resizable split pane
+- **AI-powered file editing** — ask Claude Code, Codex, or Gemini to edit any open file directly from the editor; changes shown as diff before saving (`Ctrl+Enter` to submit)
+- **Skill Creator Wizard** — 5-step guided skill creation with template selection (simple, pattern, checklist, workflow), trigger configuration, and content preview
+- **Insights Dashboard** — skill usage analytics from `history.jsonl` and plugin cache; sortable skill table, plugin breakdown, and on-demand scan via `claude /insights`
+- **Resource config system** — `ResourceConfig` type and registry for declarative resource management; supports custom `onAfterDelete`/`onAfterCreate` callbacks and wizard enablement per resource
+
+### Changed
+- Window default size increased to 1280×820 (minimum 800×560) for better content density
+- Auto-select newly created files in the editor immediately after creation
+- `create_full_backup` is now cross-platform — uses `date -r` on macOS, `date -d` on Linux
+
+### Fixed
+- AI panel no longer appears on binary files (images, PDFs, etc.) — only shown for text files
+- Error handling added to Sessions, Teams, Todos, and Tasks views (previously silent failures)
+- `read_plugin_file` hardened against absolute path and symlink-based path traversal attacks
+- CSP set to restrictive policy (was `null`) — reduces XSS attack surface in production builds
+
 ## [0.2.0] - 2026-03-25
 
 ### Added

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { claudeDir, listDirFull, readFile, getCreatedAt, deleteFile } from '../lib/fs';
+  import { addToast } from '../lib/toast.svelte';
   import ContextMenu from '../components/ContextMenu.svelte';
   import ConfirmModal from '../components/ConfirmModal.svelte';
   import EmptyState from '../components/EmptyState.svelte';
@@ -78,9 +79,13 @@
                 path: inboxPath,
                 messages: Array.isArray(messages) ? messages : [],
               });
-            } catch {}
+            } catch (e) {
+              addToast(`Failed to read inbox: ${e}`, 'error');
+            }
           }
-        } catch {}
+        } catch (e) {
+          addToast(`Failed to load inboxes: ${e}`, 'error');
+        }
 
         inboxes.sort((a, b) => a.name.localeCompare(b.name));
         result.push({ id: e.name, path: teamPath, inboxes, createdAt });
@@ -91,6 +96,7 @@
       onCount(result.length);
     } catch (e) {
       console.error('[Teams] Load failed:', e);
+      addToast(`Failed to load teams: ${e}`, 'error');
     }
   }
 

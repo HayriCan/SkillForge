@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { claudeDir, listDirFull, readFile, getCreatedAt, deleteFile } from '../lib/fs';
+  import { addToast } from '../lib/toast.svelte';
   import ContextMenu from '../components/ContextMenu.svelte';
   import ConfirmModal from '../components/ConfirmModal.svelte';
   import EmptyState from '../components/EmptyState.svelte';
@@ -66,7 +67,9 @@
             items,
             createdAt,
           });
-        } catch {}
+        } catch (e) {
+          addToast(`Failed to read todo: ${e}`, 'error');
+        }
       }
 
       result.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
@@ -74,6 +77,7 @@
       onCount(result.length);
     } catch (e) {
       console.error('[Todos] Load failed:', e);
+      addToast(`Failed to load todos: ${e}`, 'error');
     }
   }
 

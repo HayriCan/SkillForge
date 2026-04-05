@@ -68,6 +68,7 @@ const T: TranslationMap = {
   'nav.mcp':        ['MCP', 'MCP', 'MCP', 'MCP', 'MCP', 'MCP', 'MCP', 'MCP', 'MCP'],
   'nav.sessions':   ['Sessions', 'Sitzungen', 'Sessions', 'セッション', '세션', 'Sesje', 'Oturumlar', '会话', '工作階段'],
   'nav.settings':   ['Settings', 'Einstellungen', 'Paramètres', '設定', '설정', 'Ustawienia', 'Ayarlar', '设置', '設定'],
+  'nav.insights':   ['Insights', 'Einblicke', 'Aperçus', 'インサイト', '인사이트', 'Statystyki', 'İstatistikler', '洞察', '洞察'],
 
   // ── Gear menu ──
   'menu.about':          ['About', 'Über', 'À propos', 'このアプリについて', '정보', 'O programie', 'Hakkında', '关于', '關於'],
@@ -176,6 +177,31 @@ const T: TranslationMap = {
 
   // ── Settings: Global Instructions ──
   'settings.global_instructions': ['Global Instructions', 'Globale Anweisungen', 'Instructions globales', 'グローバル指示', '전역 지시사항', 'Instrukcje globalne', 'Genel Talimatlar', '全局指令', '全域指令'],
+
+  // ── Skill Wizard ──
+  'wizard.basic_info':  ['Basic Info', 'Grundinfo', 'Infos de base', '基本情報', '기본 정보', 'Podstawowe info', 'Temel Bilgi', '基本信息', '基本資訊'],
+  'wizard.triggers':    ['Trigger Conditions', 'Auslösebedingungen', 'Conditions de déclenchement', 'トリガー条件', '트리거 조건', 'Warunki wyzwalania', 'Tetikleme Koşulları', '触发条件', '觸發條件'],
+  'wizard.template':    ['Choose Template', 'Vorlage wählen', 'Choisir un modèle', 'テンプレート選択', '템플릿 선택', 'Wybierz szablon', 'Şablon Seç', '选择模板', '選擇範本'],
+  'wizard.content':     ['Content', 'Inhalt', 'Contenu', 'コンテンツ', '콘텐츠', 'Treść', 'İçerik', '内容', '內容'],
+  'wizard.save':        ['Save', 'Speichern', 'Enregistrer', '保存', '저장', 'Zapisz', 'Kaydet', '保存', '儲存'],
+  'wizard.save_skill':  ['Save Skill', 'Skill speichern', 'Enregistrer la compétence', 'スキルを保存', '스킬 저장', 'Zapisz umiejętność', 'Beceriyi Kaydet', '保存技能', '儲存技能'],
+  'wizard.next':        ['Next', 'Weiter', 'Suivant', '次へ', '다음', 'Dalej', 'İleri', '下一步', '下一步'],
+  'wizard.back':        ['Back', 'Zurück', 'Retour', '戻る', '이전', 'Wstecz', 'Geri', '上一步', '上一步'],
+
+  // ── Insights ──
+  'insights.scan':             ['Scan', 'Scannen', 'Scanner', 'スキャン', '스캔', 'Skanuj', 'Tara', '扫描', '掃描'],
+  'insights.scanning':         ['Scanning...', 'Scannen...', 'Analyse...', 'スキャン中...', '스캔 중...', 'Skanowanie...', 'Taranıyor...', '扫描中...', '掃描中...'],
+  'insights.generating':       ['Running claude /insights... (~30s)', 'Claude /insights wird ausgeführt... (~30s)', 'Exécution de claude /insights... (~30s)', 'claude /insights 実行中... (~30秒)', 'claude /insights 실행 중... (~30초)', 'Uruchamianie claude /insights... (~30s)', 'claude /insights çalıştırılıyor... (~30sn)', '正在运行 claude /insights...（约30秒）', '正在執行 claude /insights...（約30秒）'],
+  'insights.parsing':          ['Parsing data...', 'Daten werden analysiert...', 'Analyse des données...', 'データ解析中...', '데이터 분석 중...', 'Analizowanie danych...', 'Veriler ayrıştırılıyor...', '正在解析数据...', '正在解析資料...'],
+  'insights.empty_title':      ['No insights yet', 'Noch keine Einblicke', 'Pas encore de données', 'インサイトなし', '인사이트 없음', 'Brak statystyk', 'Henüz istatistik yok', '暂无洞察', '尚無洞察'],
+  'insights.empty_desc':       ['Scan your plugin skills to see usage analytics', 'Scannen Sie Ihre Plugin-Skills für Nutzungsanalysen', 'Scannez vos compétences pour voir les analyses', 'プラグインスキルをスキャンして使用状況を確認', '플러그인 스킬을 스캔하여 사용 분석 보기', 'Skanuj umiejętności wtyczek aby zobaczyć analizy', 'Kullanım analizlerini görmek için eklenti becerilerini tarayın', '扫描插件技能以查看使用分析', '掃描外掛技能以查看使用分析'],
+  'insights.plugins':          ['Plugins', 'Plugins', 'Extensions', 'プラグイン', '플러그인', 'Wtyczki', 'Eklentiler', '插件', '外掛'],
+  'insights.skills':           ['Skills', 'Fähigkeiten', 'Compétences', 'スキル', '스킬', 'Umiejętności', 'Beceriler', '技能', '技能'],
+  'insights.used':             ['Used', 'Benutzt', 'Utilisés', '使用済み', '사용됨', 'Używane', 'Kullanılan', '已使用', '已使用'],
+  'insights.wasted':           ['Wasted Tokens', 'Verschwendete Tokens', 'Tokens gaspillés', '無駄なトークン', '낭비된 토큰', 'Zmarnowane tokeny', 'Boşa Harcanan Token', '浪费的令牌', '浪費的令牌'],
+  'insights.sessions':         ['Sessions', 'Sitzungen', 'Sessions', 'セッション', '세션', 'Sesje', 'Oturumlar', '会话', '工作階段'],
+  'insights.plugin_breakdown': ['Plugin Breakdown', 'Plugin-Aufschlüsselung', 'Détail des extensions', 'プラグイン内訳', '플러그인 분석', 'Podział wtyczek', 'Eklenti Dağılımı', '插件分析', '外掛分析'],
+  'insights.skill_table':      ['Skill Usage', 'Skill-Nutzung', 'Utilisation des compétences', 'スキル使用状況', '스킬 사용량', 'Użycie umiejętności', 'Beceri Kullanımı', '技能使用情况', '技能使用情況'],
 
   // ── Toasts ──
   'toast.preferences_saved': ['Preferences saved', 'Einstellungen gespeichert', 'Préférences enregistrées', '設定を保存しました', '환경설정 저장됨', 'Preferencje zapisane', 'Tercihler kaydedildi', '偏好设置已保存', '偏好設定已儲存'],

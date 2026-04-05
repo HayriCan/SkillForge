@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { claudeDir, listDirFull, readFile, writeFile, deleteFile, getCreatedAt } from '../lib/fs';
+  import { addToast } from '../lib/toast.svelte';
   import ContextMenu from '../components/ContextMenu.svelte';
   import ConfirmModal from '../components/ConfirmModal.svelte';
   import EmptyState from '../components/EmptyState.svelte';
@@ -96,7 +97,9 @@
               isJson,
               summary: isJson ? parseTaskSummary(content, file.name) ?? undefined : undefined,
             });
-          } catch {}
+          } catch (e) {
+            addToast(`Failed to read task file: ${e}`, 'error');
+          }
         }
 
         if (files.length === 0) continue;
@@ -128,6 +131,7 @@
       }
     } catch (e) {
       console.error('[Tasks] Load failed:', e);
+      addToast(`Failed to load tasks: ${e}`, 'error');
     }
   }
 
