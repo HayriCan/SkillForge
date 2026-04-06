@@ -1,6 +1,6 @@
 [package]
 name = "skill-forge"
-version = "0.8.0"
+version = "0.9.0"
 description = "Skill Forge — AI agent configuration manager"
 authors = ["you"]
 edition = "2021"
@@ -26,3 +26,4 @@ tauri-plugin-fs = "2.4.5"
 tauri-plugin-updater = "2"
 tauri-plugin-dialog = "2.6.0"
 tauri-plugin-process = "2.3.1"
+tokio = { version = "1", features = ["process", "io-util"] }

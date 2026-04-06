@@ -12,6 +12,7 @@
   import DiffView from './DiffView.svelte';
   import SkillWizard from './SkillWizard.svelte';
   import { invoke } from '@tauri-apps/api/core';
+  import { isMac } from '../lib/shortcuts';
   import type { ResourceConfig } from '../lib/resource-config';
   import { defaultFolderConfig } from '../lib/resource-config';
 
@@ -89,6 +90,8 @@
   // AI prompt panel
   let aiPrompt = $state('');
   let aiRunning = $state(false);
+  let aiMode = $state<'edit' | 'ask'>('edit');
+  let aiResponse = $state<string | null>(null);
   let showHistory = $state(false);
   let historyEntries = $state<ReturnType<typeof getFileHistory>>([]);
 
@@ -182,7 +185,8 @@
         return a.name.localeCompare(b.name);
       });
       entries = result;
-      onCount(result.length);
+      // Only update sidebar badge when at root — subfolder navigation shouldn't change the count
+      if (pathSegments.length === 0) onCount(result.length);
       if (initialSelect) {
         const match = result.find((e) =>
           e.name === initialSelect ||
@@ -218,6 +222,7 @@
     rawMode = false;
     showHistory = false;
     showDiff = false;
+    aiResponse = null;
     viewMode = isTextFile(entry.name) && HTML_EXTS.has(entry.ext) ? 'preview' : 'source';
     if (isTextFile(entry.name)) {
       loadingContent = true;
@@ -272,6 +277,7 @@
 
   async function runAiPrompt(): Promise<void> {
     if (!selectedFile || !aiPrompt.trim() || aiRunning) return;
+    if (aiMode === 'ask') { await runAiAsk(); return; }
     aiRunning = true;
     try {
       // Include parent dir name for context (e.g. "debug-helper/SKILL.md")
@@ -287,7 +293,28 @@
       });
       editContent = stripCodeFences(result);
       aiPrompt = '';
-      addToast('AI applied changes — review and save', 'success');
+      showDiff = true;
+      addToast(t('editor.ai_applied'), 'success');
+    } catch (e) {
+      addToast(`AI error: ${e}`, 'error');
+    } finally {
+      aiRunning = false;
+    }
+  }
+
+  async function runAiAsk(): Promise<void> {
+    if (!selectedFile || !aiPrompt.trim() || aiRunning) return;
+    aiRunning = true;
+    aiResponse = null;
+    try {
+      const pathParts = selectedFile.path.replace(/\\/g, '/').split('/');
+      const displayName = pathParts.length >= 2
+        ? `${pathParts[pathParts.length - 2]}/${selectedFile.name}`
+        : selectedFile.name;
+      const prompt = `File: ${displayName}\n\nContent:\n${editContent}\n\nQuestion: ${aiPrompt.trim()}\n\nAnswer concisely. If you have change suggestions, explain what to change and why — do not output the full file.`;
+      const result = await invoke<string>('run_cli_prompt', { cliId: activeCli, prompt });
+      aiResponse = result.trim();
+      aiPrompt = '';
     } catch (e) {
       addToast(`AI error: ${e}`, 'error');
     } finally {
@@ -657,7 +684,25 @@
 
           <!-- AI prompt panel — only visible when a text file is open -->
           {#if selectedFile && !selectedFile.isDir && isTextFile(selectedFile.name)}
-            <div class="border-t border-[var(--border-subtle)] shrink-0 px-3 py-2.5 flex gap-2 items-end bg-[var(--surface-1)]">
+            <!-- Divider with AI label -->
+            <div class="shrink-0 flex items-center gap-2 px-3 pt-2 pb-0" style="border-top: 2px solid var(--accent-dim, #6366f1)20;">
+              <div style="height:1px;flex:1;background:linear-gradient(to right,var(--accent-dim,#6366f1)30,transparent);opacity:0.3;"></div>
+              <span class="text-[9px] font-mono uppercase tracking-widest px-1.5" style="color:var(--accent-dim,#6366f1);opacity:0.7;letter-spacing:.12em;">AI Assistant</span>
+              <div style="height:1px;flex:1;background:linear-gradient(to left,var(--accent-dim,#6366f1)30,transparent);opacity:0.3;"></div>
+            </div>
+            <!-- AI response panel (Ask mode) -->
+            {#if aiResponse}
+              <div class="shrink-0 mx-3 mb-1.5 rounded-lg overflow-hidden animate-fade-in" style="background:color-mix(in srgb,var(--accent,#6366f1) 6%,var(--surface-1));border:1px solid color-mix(in srgb,var(--accent-dim,#6366f1) 25%,transparent);">
+                <div class="flex items-center justify-between px-3 py-1.5" style="border-bottom:1px solid color-mix(in srgb,var(--accent-dim,#6366f1) 15%,transparent);">
+                  <span class="text-[9px] font-mono uppercase tracking-widest" style="color:var(--accent-dim,#6366f1);">{activeCli} response</span>
+                  <button onclick={() => aiResponse = null} class="text-[10px] text-[var(--text-ghost)] hover:text-[var(--text-muted)] transition-colors">✕</button>
+                </div>
+                <div class="px-3 py-2 max-h-40 overflow-y-auto">
+                  <p class="text-[12px] text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed">{aiResponse}</p>
+                </div>
+              </div>
+            {/if}
+            <div class="shrink-0 px-3 pb-2.5 pt-1 flex gap-2 items-end" style="background:color-mix(in srgb,var(--accent,#6366f1) 4%,var(--surface-1));border-top:1px solid color-mix(in srgb,var(--accent-dim,#6366f1) 12%,transparent);">
               <div class="flex-1 flex flex-col gap-1.5">
                 <div class="flex items-center gap-1.5">
                   <svg class="w-3 h-3 text-[var(--accent-dim)] shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -665,15 +710,31 @@
                     <path d="M13 9l.7 1.6L15 11l-1.3.4L13 13l-.7-1.6L11 11l1.3-.4z"/>
                   </svg>
                   <span class="text-[10px] text-[var(--text-ghost)] font-mono uppercase tracking-wide">{activeCli}</span>
-                  <span class="text-[10px] text-[var(--text-ghost)]">· describe the change you want</span>
+                  <!-- Mode toggle -->
+                  <div class="ml-auto flex items-center rounded overflow-hidden border border-[var(--border-subtle)]">
+                    <button
+                      onclick={() => { aiMode = 'edit'; aiResponse = null; }}
+                      class="px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide transition-colors
+                             {aiMode === 'edit' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-ghost)] hover:text-[var(--text-muted)]'}"
+                    >Edit</button>
+                    <button
+                      onclick={() => aiMode = 'ask'}
+                      class="px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide transition-colors
+                             {aiMode === 'ask' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-ghost)] hover:text-[var(--text-muted)]'}"
+                    >Ask</button>
+                  </div>
                 </div>
                 <!-- svelte-ignore a11y_autofocus -->
                 <textarea
                   bind:value={aiPrompt}
                   autofocus
                   rows="2"
-                  placeholder="e.g. Add a step for error handling, translate to English, add YAML frontmatter..."
-                  class="w-full bg-[var(--surface-2)] border border-[var(--border-subtle)] rounded-lg px-3 py-2 text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none focus:border-[var(--accent-dim)] transition-colors font-sans"
+                  placeholder={aiMode === 'edit'
+                    ? 'e.g. Add error handling, translate to English, add YAML frontmatter…'
+                    : 'e.g. What does this skill do? Any improvements?'}
+                  class="w-full rounded-lg px-3 py-2 text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-ghost)] outline-none resize-none transition-colors font-sans" style="background:color-mix(in srgb,var(--accent,#6366f1) 6%,var(--surface-2));border:1px solid color-mix(in srgb,var(--accent-dim,#6366f1) 20%,var(--border-subtle));"
+                  onfocus={(e) => { (e.currentTarget as HTMLTextAreaElement).style.borderColor = 'color-mix(in srgb,var(--accent-dim,#6366f1) 50%,transparent)'; }}
+                  onblur={(e) => { (e.currentTarget as HTMLTextAreaElement).style.borderColor = 'color-mix(in srgb,var(--accent-dim,#6366f1) 20%,var(--border-subtle))'; }}
                   onkeydown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); runAiPrompt(); } }}
                 ></textarea>
               </div>
@@ -686,10 +747,10 @@
                   {#if aiRunning}
                     <span class="flex items-center gap-1.5">
                       <span class="w-2.5 h-2.5 border border-current border-t-transparent rounded-full animate-spin inline-block"></span>
-                      Running…
+                      {aiMode === 'ask' ? 'Asking…' : 'Running…'}
                     </span>
                   {:else}
-                    Run ⌘↵
+                    {aiMode === 'ask' ? 'Ask' : 'Run'} {isMac ? '⌘' : 'Ctrl+'}↵
                   {/if}
                 </button>
               </div>

@@ -21,6 +21,11 @@ export type AppConfig = {
    * Key: CliId, Value: array of dir names to show in Resources sidebar.
    */
   resourceDirs?: Partial<Record<string, string[]>>;
+  /**
+   * Per-CLI custom emoji icons for nav items.
+   * Key: CliId, Value: map of dir/view id → emoji string.
+   */
+  resourceIcons?: Partial<Record<string, Record<string, string>>>;
 };
 
 let configCache: AppConfig | null = null;

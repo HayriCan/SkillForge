@@ -275,6 +275,21 @@ export function isSnapshotStale(
 }
 
 /**
+ * Returns true if the snapshot was generated within maxAgeMs milliseconds.
+ * Default: 30 minutes.
+ */
+export function isSnapshotRecent(
+  snapshot: InsightsSnapshot,
+  maxAgeMs: number = 30 * 60 * 1000,
+): boolean {
+  try {
+    return Date.now() - new Date(snapshot.generatedAt).getTime() < maxAgeMs;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Count lines in history.jsonl.
  */
 export async function countHistoryLines(claudeDir: string): Promise<number> {

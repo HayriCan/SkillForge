@@ -129,19 +129,70 @@ fn read_plugin_file(config_dir_name: String, relative_path: String) -> Result<St
     std::fs::read_to_string(&full).map_err(|e| format!("{}: {e}", full.display()))
 }
 
+/// Send an arbitrary prompt to the active CLI and return raw stdout.
+/// Used for AI-generated suggestions and other open-ended queries.
+/// Async so it never blocks the Tauri invoke queue.
+#[tauri::command]
+async fn run_cli_prompt(cli_id: String, prompt: String) -> Result<String, String> {
+    use tokio::io::AsyncWriteExt;
+    use tokio::process::Command;
+    use std::process::Stdio;
+
+    let home = std::env::var("HOME").unwrap_or_default();
+    let path_env = format!(
+        "{home}/.local/bin:{home}/.npm-global/bin:/usr/local/bin:/usr/bin:/bin",
+        home = home
+    );
+
+    let sh_cmd = match cli_id.as_str() {
+        "claude" => "claude --print".to_string(),
+        "codex"  => "codex -q".to_string(),
+        "gemini" => "gemini -p".to_string(),
+        other    => return Err(format!("Unknown CLI: {other}")),
+    };
+
+    let mut child = Command::new("sh")
+        .args(["-c", &sh_cmd])
+        .env("PATH", &path_env)
+        .current_dir(&home)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn {cli_id}: {e}"))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(prompt.as_bytes()).await;
+        let _ = stdin.shutdown().await;
+    }
+
+    let output = child
+        .wait_with_output()
+        .await
+        .map_err(|e| format!("CLI wait failed: {e}"))?;
+
+    if !output.status.success() && output.stdout.is_empty() {
+        return Err(String::from_utf8_lossy(&output.stderr).into_owned());
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
 /// Run the active CLI (claude/codex/gemini) with a file context prompt.
 /// The full prompt (with file content + user instruction) is sent via stdin
 /// to the CLI's non-interactive print mode.
 /// Returns the CLI's stdout — the modified file content.
+/// Async so it never blocks the Tauri invoke queue.
 #[tauri::command]
-fn run_cli_on_file(
+async fn run_cli_on_file(
     cli_id: String,
     file_name: String,
     file_content: String,
     user_prompt: String,
 ) -> Result<String, String> {
-    use std::io::Write;
-    use std::process::{Command, Stdio};
+    use tokio::io::AsyncWriteExt;
+    use tokio::process::Command;
+    use std::process::Stdio;
 
     let home = std::env::var("HOME").unwrap_or_default();
     let path_env = format!(
@@ -171,11 +222,13 @@ fn run_cli_on_file(
         .map_err(|e| format!("Failed to spawn {cli_id}: {e}"))?;
 
     if let Some(mut stdin) = child.stdin.take() {
-        let _ = stdin.write_all(full_prompt.as_bytes());
+        let _ = stdin.write_all(full_prompt.as_bytes()).await;
+        let _ = stdin.shutdown().await;
     }
 
     let output = child
         .wait_with_output()
+        .await
         .map_err(|e| format!("CLI wait failed: {e}"))?;
 
     if !output.status.success() && output.stdout.is_empty() {
@@ -202,7 +255,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![run_claude_mcp_list, read_plugin_file, create_full_backup, toggle_devtools, generate_insights, run_cli_on_file])
+        .invoke_handler(tauri::generate_handler![run_claude_mcp_list, read_plugin_file, create_full_backup, toggle_devtools, generate_insights, run_cli_on_file, run_cli_prompt])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

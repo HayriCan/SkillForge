@@ -174,6 +174,7 @@ const T: TranslationMap = {
   'editor.preview':    ['Preview', 'Vorschau', 'Aperçu', 'プレビュー', '미리보기', 'Podgląd', 'Önizleme', '预览', '預覽'],
   'editor.saving':     ['Saving...', 'Speichern...', 'Enregistrement...', '保存中...', '저장 중...', 'Zapisywanie...', 'Kaydediliyor...', '保存中...', '儲存中...'],
   'editor.unsaved':    ['unsaved', 'ungespeichert', 'non enregistré', '未保存', '미저장', 'niezapisane', 'kaydedilmedi', '未保存', '未儲存'],
+  'editor.ai_applied': ['AI applied changes — review and save', 'KI hat Änderungen vorgenommen', 'IA a appliqué les modifications', 'AIが変更を適用しました', 'AI가 변경 사항을 적용했습니다', 'AI zastosowało zmiany', 'AI değişiklikleri uyguladı — inceleyin ve kaydedin', 'AI 已应用更改', 'AI 已套用變更'],
 
   // ── Settings: Global Instructions ──
   'settings.global_instructions': ['Global Instructions', 'Globale Anweisungen', 'Instructions globales', 'グローバル指示', '전역 지시사항', 'Instrukcje globalne', 'Genel Talimatlar', '全局指令', '全域指令'],
@@ -202,6 +203,17 @@ const T: TranslationMap = {
   'insights.sessions':         ['Sessions', 'Sitzungen', 'Sessions', 'セッション', '세션', 'Sesje', 'Oturumlar', '会话', '工作階段'],
   'insights.plugin_breakdown': ['Plugin Breakdown', 'Plugin-Aufschlüsselung', 'Détail des extensions', 'プラグイン内訳', '플러그인 분석', 'Podział wtyczek', 'Eklenti Dağılımı', '插件分析', '外掛分析'],
   'insights.skill_table':      ['Skill Usage', 'Skill-Nutzung', 'Utilisation des compétences', 'スキル使用状況', '스킬 사용량', 'Użycie umiejętności', 'Beceri Kullanımı', '技能使用情况', '技能使用情況'],
+
+  // ── Suggestions ──
+  'suggestions.button':        ['Suggest Skills', 'Skills vorschlagen', 'Suggérer des compétences', 'スキル提案', '스킬 제안', 'Sugeruj umiejętności', 'Skill Öner', '推荐技能', '推薦技能'],
+  'suggestions.panel_title':   ['AI Suggestions', 'KI-Vorschläge', 'Suggestions IA', 'AI提案', 'AI 제안', 'Sugestie AI', 'Sana Özel Öneriler', 'AI 建议', 'AI 建議'],
+  'suggestions.refresh':       ['Refresh', 'Aktualisieren', 'Actualiser', '更新', '새로고침', 'Odśwież', 'Yenile', '刷新', '重新整理'],
+  'suggestions.add':           ['Add', 'Hinzufügen', 'Ajouter', '追加', '추가', 'Dodaj', 'Ekle', '添加', '新增'],
+  'suggestions.step_insights': ['Reading usage data…', 'Nutzungsdaten werden gelesen…', 'Lecture des données…', '使用データを読込中…', '사용 데이터 읽는 중…', 'Odczytywanie danych…', 'Kullanım verisi okunuyor…', '正在读取使用数据…', '正在讀取使用資料…'],
+  'suggestions.step_analyzing':['Analyzing usage patterns…', 'Nutzungsmuster werden analysiert…', 'Analyse des patterns…', '使用パターンを分析中…', '사용 패턴 분석 중…', 'Analizowanie wzorców…', 'Kullanım desenleri analiz ediliyor…', '正在分析使用模式…', '正在分析使用模式…'],
+  'suggestions.hint':          ['This may take a few seconds', 'Dies kann einige Sekunden dauern', 'Cela peut prendre quelques secondes', '数秒かかる場合があります', '몇 초 걸릴 수 있습니다', 'Może to zająć kilka sekund', 'Bu birkaç saniye sürebilir', '这可能需要几秒钟', '這可能需要幾秒鐘'],
+  'suggestions.empty':         ['No suggestions generated. Try again.', 'Keine Vorschläge. Erneut versuchen.', 'Aucune suggestion. Réessayez.', '提案がありません。再試行してください。', '제안 없음. 다시 시도하세요.', 'Brak sugestii. Spróbuj ponownie.', 'Öneri üretilemedi. Tekrar dene.', '未生成建议，请重试。', '未產生建議，請重試。'],
+  'suggestions.claude_only':   ['AI Suggestions are only available for Claude Code.', 'KI-Vorschläge sind nur für Claude Code verfügbar.', 'Les suggestions IA ne sont disponibles que pour Claude Code.', 'AI提案はClaude Codeのみ対応しています。', 'AI 제안은 Claude Code에서만 사용할 수 있습니다.', 'Sugestie AI są dostępne tylko dla Claude Code.', 'AI Önerileri yalnızca Claude Code için kullanılabilir.', 'AI 建议仅适用于 Claude Code。', 'AI 建議僅適用於 Claude Code。'],
 
   // ── Toasts ──
   'toast.preferences_saved': ['Preferences saved', 'Einstellungen gespeichert', 'Préférences enregistrées', '設定を保存しました', '환경설정 저장됨', 'Preferencje zapisane', 'Tercihler kaydedildi', '偏好设置已保存', '偏好設定已儲存'],

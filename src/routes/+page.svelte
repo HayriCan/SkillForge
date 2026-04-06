@@ -13,6 +13,7 @@
   import Settings from '../views/Settings.svelte';
   import Insights from '../views/Insights.svelte';
   import UnifiedResourceView from '../components/UnifiedResourceView.svelte';
+  import SuggestionPanel from '../components/SuggestionPanel.svelte';
   import { resourceConfigs } from '../lib/resource-config';
   import Tasks from '../views/Tasks.svelte';
   import Teams from '../views/Teams.svelte';
@@ -57,6 +58,7 @@
     loadAllCounts();
   }
   let showPalette = $state(false);
+  let showSuggestPanel = $state(false);
   let showOnboarding = $state(false);
   let showAbout = $state(false);
   let appVersion = $state('');
@@ -305,14 +307,29 @@
           {counts[activeView]}
         </span>
       {/if}
-      <button
-        onclick={() => showPalette = true}
-        class="ml-auto flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-2)] transition-all duration-150"
-      >
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-        <span>{t('search')}</span>
-        <kbd class="text-[9px] font-mono px-1 py-0.5 rounded bg-[var(--surface-2)] border border-[var(--border-subtle)] text-[var(--text-ghost)]">{isMac ? '⌘' : 'Ctrl+'}K</kbd>
-      </button>
+      <div class="ml-auto flex items-center gap-2">
+        <!-- Skill Öner -->
+        <button
+          onclick={() => showSuggestPanel = true}
+          class="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] hover:bg-[var(--accent-subtle)] transition-all duration-150"
+          title={t('suggestions.button')}
+        >
+          <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 1l1.2 2.8L12 5l-2.8 1.2L8 9 6.8 6.2 4 5l2.8-1.2z"/>
+            <path d="M13 9l.7 1.6L15 11l-1.3.4L13 13l-.7-1.6L11 11l1.3-.4z"/>
+          </svg>
+          <span>{t('suggestions.button')}</span>
+        </button>
+        <!-- Search -->
+        <button
+          onclick={() => showPalette = true}
+          class="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-2)] transition-all duration-150"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <span>{t('search')}</span>
+          <kbd class="text-[9px] font-mono px-1 py-0.5 rounded bg-[var(--surface-2)] border border-[var(--border-subtle)] text-[var(--text-ghost)]">{isMac ? '⌘' : 'Ctrl+'}K</kbd>
+        </button>
+      </div>
     </div>
 
     <!-- View content -->
@@ -355,6 +372,8 @@
     onClose={() => showPalette = false}
     onSelect={handlePaletteSelect}
   />
+
+  <SuggestionPanel bind:open={showSuggestPanel} />
 
   {#if showOnboarding}
     <Onboarding onComplete={handleOnboardingComplete} />
